@@ -1,0 +1,84 @@
+[build-system]
+requires      = ["setuptools>=61.0.0", "setuptools_scm[toml]>=6.2", "setuptools-rust>=1.7"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name            = "sainsc"
+description     = "Segmentation-free Analysis of In Situ Capture data"
+readme          = { file = "README.md", content-type = "text/markdown" }
+license         = { file = "LICENSE" }
+requires-python = ">=3.10"
+dynamic         = ["version"]
+
+authors = [
+    { name = "Niklas Müller-Bötticher", email = "niklas.mueller-boetticher@charite.de" },
+]
+dependencies = [
+    "anndata>=0.9",
+    "matplotlib",
+    "matplotlib-scalebar",
+    "numba>=0.44",
+    "numpy>=1.21",
+    "pandas",
+    "polars[pandas]",
+    "scikit-image>=0.18",
+    "scipy>=1.9",
+    "seaborn>=0.11",
+]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Typing :: Typed",
+]
+
+[project.optional-dependencies]
+spatialdata = ["spatialdata>=0.1"]
+docs        = ["sphinx", "sphinx-autoapi>=3.1", "sphinx-copybutton", "sphinx-rtd-theme"]
+dev         = ["sainsc[docs]", "pre-commit"]
+
+[project.urls]
+homepage      = "https://github.com/HiDiHlabs/sainsc"
+documentation = "https://sainsc.readthedocs.io"
+repository    = "https://github.com/HiDiHlabs/sainsc"
+
+
+[tool]
+
+[tool.setuptools]
+zip-safe = false
+
+[tool.setuptools.packages.find]
+# TODO improve
+include = ["sainsc", "sainsc.io", "sainsc.lazykde"]
+
+[tool.setuptools_scm]
+
+[[tool.setuptools-rust.ext-modules]]
+target = "sainsc._utils_rust"
+
+[tool.isort]
+profile = "black"
+
+[tool.black]
+target-version = ["py310", "py311", "py312"]
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.mypy]
+python_version         = "3.10"
+ignore_missing_imports = true
+warn_no_return         = false
+packages               = "sainsc"
+plugins                = "numpy.typing.mypy_plugin"
+
+[tool.codespell]
+ignore-words-list = "coo,crate"
