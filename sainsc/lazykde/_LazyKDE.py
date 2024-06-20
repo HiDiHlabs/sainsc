@@ -84,6 +84,7 @@ class LazyKDE:
         self._local_maxima: _Local_Max | None = None
         self._celltype_map: NDArray[np.signedinteger] | None = None
         self._cosine_similarity: NDArray[np.float32] | None = None
+        self._assignment_score: NDArray[np.float32] | None = None
         self._celltypes: list[str] | None = None
 
     ## Kernel
@@ -495,7 +496,7 @@ class LazyKDE:
 
         fn = self._calculate_cosine_celltype_fn(ct_dtype)
 
-        self._cosine_similarity, self._celltype_map = fn(
+        self._cosine_similarity, self._assignment_score, self._celltype_map = fn(
             self.counts,
             genes,
             signatures_mat,
@@ -953,6 +954,55 @@ class LazyKDE:
             scalebar_kwargs=scalebar_kwargs,
         )
 
+    def plot_assignment_score(
+        self,
+        *,
+        remove_background: bool = False,
+        crop: _RangeTuple2D | None = None,
+        scalebar: bool = True,
+        im_kwargs: dict = dict(),
+        scalebar_kwargs: dict = _SCALEBAR,
+    ) -> Figure:
+        """
+        Plot the assignment score from cell-type assignment.
+
+        Parameters
+        ----------
+        remove_background : bool, optional
+            If `True`, all pixels for which :py:attr:`sainsc.LazyKDE.background` is
+            `False` are set to 0.
+        crop : tuple[tuple[int, int], tuple[int, int]], optional
+            Coordinates to crop the data defined as `((xmin, xmax), (ymin, ymax))`.
+        scalebar : bool, optional
+            If `True`, add a ``matplotlib_scalebar.scalebar.ScaleBar`` to the plot.
+        im_kwargs : dict[str, typing.Any], optional
+            Keyword arguments that are passed to :py:func:`matplotlib.pyplot.imshow`.
+        scalebar_kwargs : dict[str, typing.Any], optional
+            Keyword arguments that are passed to ``matplotlib_scalebar.scalebar.ScaleBar``.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+
+        See Also
+        --------
+        :py:meth:`sainsc.LazyKDE.assign_celltype`
+        """
+        if self.assignment_score is not None:
+            img = self.assignment_score
+        else:
+            raise ValueError("Cell types have not been assigned")
+
+        return self._plot_2d(
+            img,
+            "Assignment score",
+            remove_background=remove_background,
+            crop=crop,
+            scalebar=scalebar,
+            im_kwargs=im_kwargs,
+            scalebar_kwargs=scalebar_kwargs,
+        )
+
     ## Attributes
     @property
     def n_threads(self) -> int:
@@ -1086,6 +1136,17 @@ class LazyKDE:
         numpy.ndarray[numpy.single]: Cosine similarity for each pixel.
         """
         return self._cosine_similarity
+
+    @property
+    def assignment_score(self) -> NDArray[np.single] | None:
+        """
+        numpy.ndarray[numpy.single]: Assignment score for each pixel.
+
+        The assignment score is calculated as
+        :math:`\max_j(cosine_{ij}) / \sum_j cosine_{ij}` for each pixel `i` and
+        cell type `j`.
+        """
+        return self._assignment_score
 
     @property
     def celltype_map(self) -> NDArray[np.signedinteger] | None:

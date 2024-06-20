@@ -254,7 +254,7 @@ impl GridCounts {
         self.counts = counts;
         self.shape = shape;
         self.resolution = resolution;
-        self.set_n_threads(n_threads);
+        self.set_n_threads(n_threads)?;
 
         Ok(())
     }

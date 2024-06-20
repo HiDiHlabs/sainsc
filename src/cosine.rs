@@ -1,6 +1,7 @@
 use crate::gridcounts::GridCounts;
 use crate::sparsekde::sparse_kde_csx_;
 use crate::utils::create_pool;
+
 use ndarray::{
     concatenate, s, Array, Array2, Array3, ArrayView2, Axis, NdFloat, NewAxis, ShapeError, Slice,
     Zip,
@@ -31,7 +32,7 @@ macro_rules! build_cos_ct_fn {
             log: bool,
             chunk_size: (usize, usize),
             n_threads: Option<usize>,
-        ) -> PyResult<(Bound<'py, PyArray2<$t_cos>>, Bound<'py, PyArray2<$t_ct>>)> {
+        ) -> PyResult<(Bound<'py, PyArray2<$t_cos>>, Bound<'py, PyArray2<$t_cos>>, Bound<'py, PyArray2<$t_ct>>)> {
 
             // ensure that all count arrays are CSR
             counts.to_format(CSR);
@@ -55,8 +56,9 @@ macro_rules! build_cos_ct_fn {
             );
 
             match cos_ct {
-                Ok((cosine, celltype_map)) => Ok((
+                Ok((cosine, score, celltype_map)) => Ok((
                     cosine.into_pyarray_bound(py),
+                    score.into_pyarray_bound(py),
                     celltype_map.into_pyarray_bound(py),
                 )),
                 Err(e) => Err(PyValueError::new_err(e.to_string())),
@@ -76,7 +78,7 @@ fn chunk_and_calculate_cosine<'a, C, I, F, U>(
     log: bool,
     chunk_size: (usize, usize),
     n_threads: usize,
-) -> Result<(Array2<F>, Array2<U>), Box<dyn Error>>
+) -> Result<(Array2<F>, Array2<F>, Array2<U>), Box<dyn Error>>
 where
     C: NumCast + Copy + Sync + Send + Default,
     I: SpIndex + Signed + Sync + Send,
@@ -94,6 +96,7 @@ where
     let (m, n) = (nrow.div_ceil(srow), ncol.div_ceil(scol)); // number of chunks
 
     let mut cosine_rows = Vec::with_capacity(m);
+    let mut score_rows = Vec::with_capacity(m);
     let mut celltype_rows = Vec::with_capacity(m);
 
     pool.install(|| {
@@ -108,7 +111,10 @@ where
                 })
                 .collect();
 
-            let (cosine_cols, celltype_cols): (Vec<Array2<F>>, Vec<Array2<U>>) = (0..n)
+            let ((cosine_cols, score_cols), celltype_cols): (
+                (Vec<Array2<F>>, Vec<Array2<F>>),
+                Vec<Array2<U>>,
+            ) = (0..n)
                 .into_par_iter()
                 .map(|j| {
                     let (slice_col, unpad_col) = chunk_(j, scol, ncol, padcol);
@@ -128,13 +134,15 @@ where
                 })
                 .unzip();
             cosine_rows.push(concat_1d(cosine_cols, 1));
+            score_rows.push(concat_1d(score_cols, 1));
             celltype_rows.push(concat_1d(celltype_cols, 1));
         }
     });
 
     let cosine = concat_1d(cosine_rows.into_iter().collect::<Result<Vec<_>, _>>()?, 0)?;
+    let score = concat_1d(score_rows.into_iter().collect::<Result<Vec<_>, _>>()?, 0)?;
     let celltype = concat_1d(celltype_rows.into_iter().collect::<Result<Vec<_>, _>>()?, 0)?;
-    Ok((cosine, celltype))
+    Ok((cosine, score, celltype))
 }
 
 fn concat_1d<T: Clone + Sync + Send>(
@@ -163,7 +171,7 @@ fn cosine_and_celltype_<'a, C, I, F, U>(
     kernel: ArrayView2<'a, F>,
     unpad: (Range<usize>, Range<usize>),
     log: bool,
-) -> (Array2<F>, Array2<U>)
+) -> ((Array2<F>, Array2<F>), Array2<U>)
 where
     C: NumCast + Copy,
     F: NdFloat,
@@ -181,7 +189,10 @@ where
         // fastpath if all csx are empty
         None => {
             let shape = (unpad_r.end - unpad_r.start, unpad_c.end - unpad_c.start);
-            (Array2::zeros(shape), Array2::from_elem(shape, -one::<U>()))
+            (
+                (Array2::zeros(shape), Array2::zeros(shape)),
+                Array2::from_elem(shape, -one::<U>()),
+            )
         }
         Some((csx, weights)) => {
             let shape = csx.shape();
@@ -223,12 +234,15 @@ where
 fn get_max_cosine_and_celltype<F, I>(
     cosine: Array3<F>,
     kde_norm: Array2<F>,
-) -> (Array2<F>, Array2<I>)
+) -> ((Array2<F>, Array2<F>), Array2<I>)
 where
     I: PrimInt + Signed,
     F: NdFloat,
 {
     let (mut max_cosine, mut celltypemap) = get_max_argmax(&cosine);
+    let score =
+        (max_cosine.clone() / cosine.sum_axis(Axis(0)))
+            .mapv(|v| if v.is_nan() { zero() } else { v });
 
     Zip::from(&mut celltypemap)
         .and(&mut max_cosine)
@@ -241,7 +255,7 @@ where
             }
         });
 
-    (max_cosine, celltypemap)
+    ((max_cosine, score), celltypemap)
 }
 
 pub fn get_max_argmax<F: PartialOrd + Copy, I: NumCast>(
@@ -295,10 +309,10 @@ mod tests {
     fn test_get_max_cosine_and_celltype() {
         let setup = Setup::new();
 
-        let cos_ct: (Array2<f64>, Array2<i8>) =
+        let cos_ct: ((Array2<f64>, Array2<f64>), Array2<i8>) =
             get_max_cosine_and_celltype(setup.cosine, setup.norm);
 
-        assert_eq!(cos_ct.0, setup.cos);
+        assert_eq!(cos_ct.0 .0, setup.cos);
         assert_eq!(cos_ct.1, setup.celltype);
     }
 }
