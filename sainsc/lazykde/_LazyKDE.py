@@ -520,6 +520,7 @@ class LazyKDE:
     ) -> Figure:
         if remove_background:
             if self.background is not None:
+                img = img.copy()
                 img[self.background] = 0
             else:
                 raise ValueError("`background` is undefined")
