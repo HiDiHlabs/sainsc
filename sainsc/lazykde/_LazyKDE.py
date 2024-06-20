@@ -1028,7 +1028,7 @@ class LazyKDE:
         return self._total_mRNA_KDE
 
     @property
-    def background(self) -> NDArray[np.bool] | None:
+    def background(self) -> NDArray[np.bool_] | None:
         """
         numpy.ndarray[numpy.bool]: Map of pixels that are assigned as background.
 
@@ -1042,7 +1042,7 @@ class LazyKDE:
         return self._background
 
     @background.setter
-    def background(self, background: NDArray[np.bool]):
+    def background(self, background: NDArray[np.bool_]):
         if background.shape != self.shape:
             raise ValueError("`background` must have same shape as `self`")
         else:
