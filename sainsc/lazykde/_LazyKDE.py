@@ -88,7 +88,12 @@ class LazyKDE:
 
     ## Kernel
     def gaussian_kernel(
-        self, sigma: float, *, truncate: float = 2, circular: bool = False
+        self,
+        sigma: float,
+        *,
+        unit: str = "px",
+        truncate: float = 2,
+        circular: bool = False,
     ):
         """
         Set the kernel used for kernel density estimation (KDE) to gaussian.
@@ -97,6 +102,9 @@ class LazyKDE:
         ----------
         sigma : float
             Bandwidth of the kernel.
+        unit : str
+            Which unit the bandwidth of the kernel is defined in: 'px' or 'um'.
+            'um' requires :py:attr:`sainsc.LazyKDE.resolution` to be set correctly.
         truncate : float, optional
             The radius for calculating the KDE is calculated as `sigma` * `truncate`.
             Refer to :py:func:`scipy.ndimage.gaussian_filter`.
@@ -104,10 +112,26 @@ class LazyKDE:
             If `True` calculate the KDE using a circular kernel instead of square by
             setting all values outside the radius `sigma` * `truncate` to 0.
 
+        Raises
+        ------
+        ValueError
+            If `unit` is neither 'px' nor 'um'.
+        ValueError
+            If `unit` is 'um' but `resolution` is not set.
+
         See Also
         --------
         :py:meth:`sainsc.LazyKDE.kde`
         """
+
+        if unit == "um":
+            if self.resolution is None:
+                raise ValueError(
+                    "Using `unit`='um' requires the `resolution` to be set."
+                )
+            sigma /= self.resolution / 1_000
+        elif unit != "px":
+            raise ValueError("`unit` must be either 'px' or 'um'")
         dtype = np.float32
         radius = round(truncate * sigma)
         self.kernel = gaussian_kernel(sigma, radius, dtype=dtype, circular=circular)
