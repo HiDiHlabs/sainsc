@@ -78,6 +78,7 @@ class LazyKDE:
 
         self._threads = n_threads
 
+        self._kernel: NDArray[np.float32] | None = None
         self._total_mRNA: NDArray[np.unsignedinteger] | None = None
         self._total_mRNA_KDE: NDArray[np.float32] | None = None
         self._background: NDArray[np.bool_] | None = None
@@ -168,6 +169,9 @@ class LazyKDE:
         if isinstance(arr, np.ndarray):
             arr = csr_array(arr)
 
+        if self.kernel is None:
+            raise ValueError("`kernel` must be set before running KDE")
+
         if arr.dtype == np.uint32:
             return sparse_kde_csx_py(arr, self.kernel, threshold=threshold)
         else:
@@ -190,6 +194,11 @@ class LazyKDE:
 
         If :py:attr:`sainsc.LazyKDE.total_mRNA` has not been calculated
         :py:meth:`sainsc.LazyKDE.calculate_total_mRNA` is run first.
+
+        Raises
+        ------
+        ValueError
+            If `self.kernel` is not set.
 
         See Also
         --------
@@ -267,6 +276,8 @@ class LazyKDE:
         ------
         ModuleNotFoundError
             If `spatialdata` is set to `True` but the package is not installed.
+        ValueError
+            If `self.kernel` is not set.
         """
         if self.local_maxima is None:
             raise ValueError("`local_maxima` have to be identified before loading")
@@ -358,6 +369,9 @@ class LazyKDE:
     def _load_KDE_maxima(self, genes: list[str]) -> csc_array | csr_array:
 
         assert self.local_maxima is not None
+        if self.kernel is None:
+            raise ValueError("`kernel` must be set before running KDE")
+
         return kde_at_coord(
             self.counts, genes, self.kernel, self.local_maxima, n_threads=self.n_threads
         )
@@ -471,12 +485,24 @@ class LazyKDE:
         chunk : tuple[int, int]
             Size of the chunks for processing. Larger chunks require more memory but
             have less duplicated computation.
+
+        Raises
+        ------
+        ValueError
+            If not all genes of the `signatures` are available.
+        ValueError
+            If `self.kernel` is not set.
+        ValueError
+            If `chunk` is smaller than the shape of `self.kernel`.
         """
 
         if not all(signatures.index.isin(self.genes)):
             raise ValueError(
                 "Not all genes in the gene signature are part of this KDE."
             )
+
+        if self.kernel is None:
+            raise ValueError("`kernel` must be set before running KDE")
 
         if not all(s < c for s, c in zip(self.kernel.shape, chunk)):
             raise ValueError("`chunk` must be larger than shape of kernel.")
@@ -1057,7 +1083,7 @@ class LazyKDE:
         self.counts.resolution = resolution
 
     @property
-    def kernel(self) -> np.ndarray:
+    def kernel(self) -> np.ndarray | None:
         """
         numpy.ndarray: Map of the KDE of total mRNA.
 
@@ -1066,7 +1092,7 @@ class LazyKDE:
             ValueError
                 If kernel is not a square, 2D :py:class:`numpy.ndarray` of uneven length.
         """
-        return self._kernel.copy()
+        return self._kernel
 
     @kernel.setter
     def kernel(self, kernel: np.ndarray):
@@ -1166,6 +1192,8 @@ class LazyKDE:
         ]
         if self.resolution is not None:
             repr.append(f"resolution: {self.resolution} nm / px")
+        if self.kernel is not None:
+            repr.append(f"kernel: {self.kernel.shape}")
         if self.background is not None:
             repr.append("background: set")
         if self.local_maxima is not None:
