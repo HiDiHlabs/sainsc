@@ -1168,9 +1168,10 @@ class LazyKDE:
         """
         numpy.ndarray[numpy.single]: Assignment score for each pixel.
 
-        The assignment score is calculated as
-        :math:`\max_j(cosine_{ij}) / \sum_j cosine_{ij}` for each pixel `i` and
-        cell type `j`.
+        Let `x` be the gene expression of a pixel, and `i` and `j` the signatures of the
+        best and 2nd best scoring cell type, respectively. The assignment score is
+        calculated as :math:`\\frac{cos(\\theta_{xi}) - cos(\\theta_{xj})}{cos(\\pi/2 - \\theta_{ij})}`
+        where :math:`\\theta` is the angle between the corresponding vectors.
         """
         return self._assignment_score
 
