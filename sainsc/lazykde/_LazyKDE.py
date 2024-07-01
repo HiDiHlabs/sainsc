@@ -91,7 +91,7 @@ class LazyKDE:
     ## Kernel
     def gaussian_kernel(
         self,
-        sigma: float,
+        bw: float,
         *,
         unit: str = "px",
         truncate: float = 2,
@@ -102,17 +102,17 @@ class LazyKDE:
 
         Parameters
         ----------
-        sigma : float
+        bw : float
             Bandwidth of the kernel.
         unit : str
             Which unit the bandwidth of the kernel is defined in: 'px' or 'um'.
             'um' requires :py:attr:`sainsc.LazyKDE.resolution` to be set correctly.
         truncate : float, optional
-            The radius for calculating the KDE is calculated as `sigma` * `truncate`.
+            The radius for calculating the KDE is calculated as `bw` * `truncate`.
             Refer to :py:func:`scipy.ndimage.gaussian_filter`.
         circular : bool, optional
             If `True` calculate the KDE using a circular kernel instead of square by
-            setting all values outside the radius `sigma` * `truncate` to 0.
+            setting all values outside the radius `bw` * `truncate` to 0.
 
         Raises
         ------
@@ -131,12 +131,12 @@ class LazyKDE:
                 raise ValueError(
                     "Using `unit`='um' requires the `resolution` to be set."
                 )
-            sigma /= self.resolution / 1_000
+            bw /= self.resolution / 1_000
         elif unit != "px":
             raise ValueError("`unit` must be either 'px' or 'um'")
         dtype = np.float32
-        radius = round(truncate * sigma)
-        self.kernel = gaussian_kernel(sigma, radius, dtype=dtype, circular=circular)
+        radius = round(truncate * bw)
+        self.kernel = gaussian_kernel(bw, radius, dtype=dtype, circular=circular)
 
     ## KDE
     def kde(self, gene: str, *, threshold: float | None = None) -> _CsxArray:

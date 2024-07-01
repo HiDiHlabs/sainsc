@@ -21,7 +21,7 @@ def _make_circular_kernel(kernel: NDArray[T], radius: int) -> NDArray[T]:
 
 
 def gaussian_kernel(
-    sigma: float,
+    bw: float,
     radius: int,
     *,
     dtype: DTypeLike = np.float32,
@@ -33,7 +33,7 @@ def gaussian_kernel(
 
     Parameters
     ----------
-    sigma : float
+    bw : float
         Bandwidth of the Gaussian.
     radius : int
         Radius of the kernel. Output size will be :math:`2*radius+1`.
@@ -54,7 +54,7 @@ def gaussian_kernel(
     dirac = signal.unit_impulse((mask_size, mask_size), idx="mid")
 
     gaussian_kernel = ndimage.gaussian_filter(
-        dirac, sigma, output=np.float64, **kwargs
+        dirac, bw, output=np.float64, **kwargs
     ).astype(dtype)
 
     if circular:
@@ -63,7 +63,7 @@ def gaussian_kernel(
     return gaussian_kernel
 
 
-def epanechnikov_kernel(sigma: float, *, dtype: DTypeLike = np.float32) -> np.ndarray:
+def epanechnikov_kernel(bw: float, *, dtype: DTypeLike = np.float32) -> np.ndarray:
     """
     Generate a 2D Epanechnikov kernel array.
 
@@ -73,7 +73,7 @@ def epanechnikov_kernel(sigma: float, *, dtype: DTypeLike = np.float32) -> np.nd
 
     Parameters
     ----------
-    sigma : float
+    bw : float
         Bandwidth of the kernel.
     dtype : numpy.typing.DTypeLike, optional
         Datatype of the kernel.
@@ -85,7 +85,7 @@ def epanechnikov_kernel(sigma: float, *, dtype: DTypeLike = np.float32) -> np.nd
     # https://doi.org/10.1109/CVPR.2000.854761
     # c_d = pi for d=2
 
-    r = math.ceil(sigma)
+    r = math.ceil(bw)
     dia = 2 * r - 1  # values at r are zero anyways so the kernel matrix can be smaller
 
     # 1/2 * pi^-1 * (d+2)
@@ -96,8 +96,8 @@ def epanechnikov_kernel(sigma: float, *, dtype: DTypeLike = np.float32) -> np.nd
         for j in range(dia):
             x = i - r + 1
             y = j - r + 1
-            norm = (x / sigma) ** 2 + (y / sigma) ** 2
+            norm = (x / bw) ** 2 + (y / bw) ** 2
             if norm < 1:
                 kernel[i, j] = scale * (1 - norm)
 
-    return kernel
+    return kernel / np.sum(kernel)
