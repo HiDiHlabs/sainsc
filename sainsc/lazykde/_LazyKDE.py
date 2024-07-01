@@ -381,36 +381,47 @@ class LazyKDE:
         self,
         min_norm: float | dict[str, float],
         min_cosine: float | dict[str, float] | None = None,
+        min_assignment: float | dict[str, float] | None = None,
     ):
         """
-        Assign beads as background.
+        Define pixels as background.
+
+        If using multiple thresholds (e.g. on norm and cosine similarity) they will be
+        combined and pixels are defined as background if they are lower than any of the
+        thresholds.
 
         Parameters
         ----------
         min_norm : float or dict[str, float]
             The threshold for defining background based on
             :py:attr:`sainsc.LazyKDE.total_mRNA_KDE`.
-            Either a float which is used as global threshold or a mapping from cell-types
+            Either a float which is used as global threshold or a mapping from cell types
             to thresholds. Cell-type assignment is needed for cell type-specific thresholds.
         min_cosine : float or dict[str, float], optional
-            The threshold for defining background based on the minimum cosine
-            similarity. Cell type-specific thresholds can be defined as for `min_norm`.
+            The threshold for defining background based on
+            :py:attr:`sainsc.LazyKDE.cosine_similarity`. Cell type-specific thresholds
+            can be defined as for `min_norm`.
+        min_assignment : float or dict[str, float], optional
+            The threshold for defining background based on
+            :py:attr:`sainsc.LazyKDE.assignment_score`. Cell type-specific thresholds
+            can be defined as for `min_norm`.
 
         Raises
         ------
         ValueError
-            If cell type-specific thresholds do not include all cell-types.
+            If cell type-specific thresholds do not include all cell types or if
+            using cell type-specific thresholds before cell type assignment.
         """
 
         @njit
         def _map_celltype_to_value(
-            ct_map: NDArray[np.integer], dict: dict[int, float]
+            ct_map: NDArray[np.integer], thresholds: tuple[float, ...]
         ) -> NDArray[np.floating]:
             values = np.zeros(shape=ct_map.shape, dtype=float)
             for i in range(ct_map.shape[0]):
                 for j in range(ct_map.shape[1]):
                     if ct_map[i, j] >= 0:
-                        values[i, j] = dict[ct_map[i, j]]
+                        values[i, j] = thresholds[ct_map[i, j]]
             return values
 
         if self.total_mRNA_KDE is None:
@@ -425,7 +436,7 @@ class LazyKDE:
                 )
             elif not all([ct in min_norm.keys() for ct in self.celltypes]):
                 raise ValueError("'min_norm' does not contain all celltypes.")
-            idx2threshold = {idx: min_norm[ct] for idx, ct in enumerate(self.celltypes)}
+            idx2threshold = tuple(min_norm[ct] for ct in self.celltypes)
             threshold = _map_celltype_to_value(self.celltype_map, idx2threshold)
             background = self.total_mRNA_KDE < threshold
         else:
@@ -443,13 +454,29 @@ class LazyKDE:
                     )
                 elif not all([ct in min_cosine.keys() for ct in self.celltypes]):
                     raise ValueError("'min_cosine' does not contain all celltypes.")
-                idx2threshold = {
-                    idx: min_cosine[ct] for idx, ct in enumerate(self.celltypes)
-                }
+                idx2threshold = tuple(min_cosine[ct] for ct in self.celltypes)
                 threshold = _map_celltype_to_value(self.celltype_map, idx2threshold)
                 background &= self.cosine_similarity >= threshold
             else:
                 background &= self.cosine_similarity >= min_cosine
+
+        if min_assignment is not None:
+            if self.assignment_score is None:
+                raise ValueError(
+                    "Assignment score threshold can only be used after cell-type assignment"
+                )
+            if isinstance(min_assignment, dict):
+                if self.celltypes is None or self.celltype_map is None:
+                    raise ValueError(
+                        "Cell type-specific threshold can only be used after cell-type assignment"
+                    )
+                elif not all([ct in min_assignment.keys() for ct in self.celltypes]):
+                    raise ValueError("'min_assignment' does not contain all celltypes.")
+                idx2threshold = tuple(min_assignment[ct] for ct in self.celltypes)
+                threshold = _map_celltype_to_value(self.celltype_map, idx2threshold)
+                background &= self.assignment_score >= threshold
+            else:
+                background &= self.assignment_score >= min_assignment
 
         self._background = background
 
