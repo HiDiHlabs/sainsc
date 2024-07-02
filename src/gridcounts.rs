@@ -274,12 +274,14 @@ impl GridCounts {
         Ok(((HashMap::new(),), HashMap::new()))
     }
 
-    // fn __iter__(&self) -> PyResult<Bound<'_, PyIterator>> {
-    //     Python::with_gil(|py| PyList::new_bound(py, self.counts.keys()).iter())
-    // }
-    // fn keys(&self) -> PyResult<Bound<'_, PyIterator>> {
-    //     self.__iter__()
-    // }
+    fn __str__(&self) -> String {
+        let repr = vec![
+            format!("GridCounts ({} threads)", self.n_threads),
+            format!("genes: {}", self.counts.len()),
+            format!("shape: {:?}", self.shape),
+        ];
+        return repr.join("\n    ");
+    }
 
     fn get(
         &self,
