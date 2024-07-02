@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import polars as pl
 import seaborn as sns
 from anndata import AnnData
 from matplotlib.axes import Axes
@@ -87,6 +88,41 @@ class LazyKDE:
         self._cosine_similarity: NDArray[np.float32] | None = None
         self._assignment_score: NDArray[np.float32] | None = None
         self._celltypes: list[str] | None = None
+
+    @classmethod
+    def from_dataframe(
+        cls, df: pl.DataFrame | pd.DataFrame, *, n_threads: int | None = None, **kwargs
+    ):
+        """
+        Construct a LazyKDE from a DataFrame.
+
+        The DataFrame must provide a 'gene', 'x', and 'y' column. If a 'count' column
+        exists it will be used as counts else a count of 1 (single molecule) per row
+        will be assumed.
+
+        Parameters
+        ----------
+        df : polars.DataFrame | pandas.DataFrame
+        n_threads : int, optional
+            Number of threads used for reading and processing file. If `None` this will
+            default to the number of available CPUs.
+        kwargs
+            Other keyword arguments are passed to
+            :py:meth:`sainsc.GridCounts.from_dataframe`.
+        """
+        if isinstance(df, pd.DataFrame):
+            df = pl.from_pandas(df)
+
+        # TODO ensure dataframe format
+        count_col = ["count"] if "count" in df.columns else []
+
+        df = df.select(
+            pl.col("gene").cast(pl.Categorical), pl.col(["x", "y"] + count_col)
+        )
+        return cls(
+            GridCounts.from_dataframe(df, n_threads=n_threads, **kwargs),
+            n_threads=n_threads,
+        )
 
     ## Kernel
     def gaussian_kernel(
