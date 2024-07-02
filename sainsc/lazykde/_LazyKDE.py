@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from itertools import chain
 from typing import TYPE_CHECKING, Any
 
 import matplotlib.pyplot as plt
@@ -896,6 +897,8 @@ class LazyKDE:
         crop: _RangeTuple2D | None = None,
         scalebar: bool = True,
         cmap: _Cmap = "hls",
+        background: str | tuple = "black",
+        undefined: str | tuple = "grey",
         scalebar_kwargs: dict = _SCALEBAR,
     ) -> Figure:
         """
@@ -916,9 +919,13 @@ class LazyKDE:
             If it is a list of colors it must have the same length as the number of
             celltypes.
             If it is a dictionary it must be a mapping from celltpye to color. Undefined
-            celltypes are plotted as `'grey'`.
+            celltypes are plotted according to `undefined`.
             Colors can either be provided as string that can be converted via
             :py:func:`matplotlib.colors.to_rgb` or as ``(r, g, b)``-tuple between 0-1.
+        background : str | tuple[float, float, float]
+            Color for the background.
+        undefined : str | tuple[float, float, float]
+            Color used for celltypes without a defined color.
         scalebar_kwargs : dict[str, typing.Any], optional
             Keyword arguments that are passed to ``matplotlib_scalebar.scalebar.ScaleBar``.
 
@@ -936,7 +943,7 @@ class LazyKDE:
 
         n_celltypes = len(self.celltypes)
 
-        celltype_map = self.celltype_map
+        celltype_map = self.celltype_map.copy()
         if remove_background:
             if self.background is None:
                 raise ValueError("Background has not been filtered.")
@@ -945,6 +952,9 @@ class LazyKDE:
 
         if crop is not None:
             celltype_map = celltype_map[tuple(slice(*c) for c in crop)]
+
+        # shift so 0 will be background
+        celltype_map += 1
 
         if isinstance(cmap, str):
             color_map = sns.color_palette(cmap, n_colors=n_celltypes)
@@ -955,13 +965,14 @@ class LazyKDE:
                     raise ValueError("You need to provide 1 color per celltype")
 
             elif isinstance(cmap, dict):
-                cmap = [cmap.get(cell, "grey") for cell in self.celltypes]
+                cmap = [cmap.get(cell, undefined) for cell in self.celltypes]
 
             color_map = [to_rgb(c) if isinstance(c, str) else c for c in cmap]
 
         # convert to uint8 to reduce memory of final image
         color_map_int = tuple(
-            (np.array(c) * 255).round().astype(np.uint8) for c in color_map
+            (np.array(c) * 255).round().astype(np.uint8)
+            for c in chain([to_rgb(background)], color_map)
         )
         img = _apply_color(celltype_map.T, color_map_int)
 

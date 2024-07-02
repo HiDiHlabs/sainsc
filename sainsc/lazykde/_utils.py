@@ -23,11 +23,10 @@ _SCALEBAR = {"units": "nm", "box_alpha": 0, "color": "w"}
 def _apply_color(
     img_in: NDArray[np.integer], cmap: tuple[NDArray[T], ...]
 ) -> NDArray[T]:
-    img = np.zeros(shape=(*img_in.shape, 3), dtype=cmap[0].dtype)
+    img = np.empty(shape=(*img_in.shape, 3), dtype=cmap[0].dtype)
     for i in range(img_in.shape[0]):
         for j in range(img_in.shape[1]):
-            if img_in[i, j] >= 0:
-                img[i, j, :] = cmap[img_in[i, j]]
+            img[i, j, :] = cmap[img_in[i, j]]
     return img
 
 
