@@ -97,13 +97,19 @@ where
     let n_celltype = signatures.ncols();
     let signature_similarity_correction =
         Array2::from_shape_fn((n_celltype, n_celltype), |(i, j)| {
-            if i > j {
+            if i != j {
                 let sig1 = signatures.index_axis(Axis(1), i);
                 let sig2 = signatures.index_axis(Axis(1), j);
-                // The dot product calculates the cosine similarity (signatures are normalized)
-                // this corresponds to cos(x) but we want cos(pi/2 - x) = sin(x)
-                // -> sin(acos(dot_product))
-                sig1.dot(&sig2).acos().sin()
+                // technically we want the dot_product of s=(sig1-sig2) with a vector where
+                // the negative dimensions of this vector are set to zero (x),
+                // but these will then cancel out anyway so we can simplify to using the
+                // dot product with itself s . x => x . x
+                // additional we need to divide by the norm of x
+                // as the norm is the sqrt of the dot product with itself (which we
+                // already calculated) divided by its sqrt we end up with
+                // s . x / norm(x) = x . x / sqrt(x . x) = sqrt(x . x)
+                let x = (&sig1 - &sig2).mapv(|x| if x <= zero() { zero() } else { x });
+                x.dot(&x).sqrt()
             } else {
                 zero()
             }
@@ -272,9 +278,7 @@ where
             } else {
                 let norm_sqrt = norm.sqrt();
                 *cos /= norm_sqrt;
-
-                let (i, j) = if i > j { (*i, *j) } else { (*j, *i) };
-                *s /= norm_sqrt * pairwise_correction[[i, j]];
+                *s /= norm_sqrt * pairwise_correction[[*i, *j]];
             };
         });
 
