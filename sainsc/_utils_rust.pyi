@@ -87,7 +87,7 @@ class GridCounts:
         """
         Parameters
         ----------
-        counts : dict[str, scipy.sparse.csr_array | scipy.sparse.csr_matrix| scipy.sparse.csc_array| scipy.sparse.csc_matrix]
+        counts : dict[str, scipy.sparse.csr_array | scipy.sparse.csr_matrix | scipy.sparse.csc_array | scipy.sparse.csc_matrix]
             Gene counts.
         resolution : float, optional
             Resolution as nm / pixel.
