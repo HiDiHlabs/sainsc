@@ -11,7 +11,7 @@ from anndata import AnnData
 from matplotlib.axes import Axes
 from matplotlib.colors import to_rgb
 from matplotlib.figure import Figure
-from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 from matplotlib_scalebar.scalebar import ScaleBar
 from mpl_toolkits import axes_grid1
 from numba import njit
@@ -977,16 +977,7 @@ class LazyKDE:
         img = _apply_color(celltype_map.T, color_map_int)
 
         legend_elements = [
-            Line2D(
-                [0],
-                [0],
-                marker="o",
-                color="w",
-                label=lbl,
-                markerfacecolor=c,
-                markersize=10,
-            )
-            for c, lbl in zip(color_map, self.celltypes)
+            Patch(color=c, label=lbl) for c, lbl in zip(color_map, self.celltypes)
         ]
 
         fig, ax = plt.subplots()
