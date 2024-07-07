@@ -900,7 +900,8 @@ class LazyKDE:
         background: str | tuple = "black",
         undefined: str | tuple = "grey",
         scalebar_kwargs: dict = _SCALEBAR,
-    ) -> Figure:
+        return_img: bool = False,
+    ) -> Figure | NDArray[np.uint8]:
         """
         Plot the cell-type annotation.
 
@@ -928,10 +929,12 @@ class LazyKDE:
             Color used for celltypes without a defined color.
         scalebar_kwargs : dict[str, typing.Any], optional
             Keyword arguments that are passed to ``matplotlib_scalebar.scalebar.ScaleBar``.
+        return_img : bool, optional
+            Return the cell-type map as 3D-array (x, y, RGB) instead of the Figure.
 
         Returns
         -------
-        matplotlib.figure.Figure
+        matplotlib.figure.Figure | numpy.ndarray[numpy.uint8]
 
 
         See Also
@@ -975,6 +978,9 @@ class LazyKDE:
             for c in chain([to_rgb(background)], color_map)
         )
         img = _apply_color(celltype_map.T, color_map_int)
+
+        if return_img:
+            return img
 
         legend_elements = [
             Patch(color=c, label=lbl) for c, lbl in zip(color_map, self.celltypes)
