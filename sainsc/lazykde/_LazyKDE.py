@@ -493,9 +493,9 @@ class LazyKDE:
                     raise ValueError("'min_cosine' does not contain all celltypes.")
                 idx2threshold = tuple(min_cosine[ct] for ct in self.celltypes)
                 threshold = _map_celltype_to_value(self.celltype_map, idx2threshold)
-                background &= self.cosine_similarity >= threshold
+                background |= self.cosine_similarity <= threshold
             else:
-                background &= self.cosine_similarity >= min_cosine
+                background |= self.cosine_similarity <= min_cosine
 
         if min_assignment is not None:
             if self.assignment_score is None:
@@ -511,9 +511,9 @@ class LazyKDE:
                     raise ValueError("'min_assignment' does not contain all celltypes.")
                 idx2threshold = tuple(min_assignment[ct] for ct in self.celltypes)
                 threshold = _map_celltype_to_value(self.celltype_map, idx2threshold)
-                background &= self.assignment_score >= threshold
+                background |= self.assignment_score <= threshold
             else:
-                background &= self.assignment_score >= min_assignment
+                background |= self.assignment_score <= min_assignment
 
         self._background = background
 
