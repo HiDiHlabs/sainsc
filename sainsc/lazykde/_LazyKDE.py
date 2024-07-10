@@ -1,15 +1,17 @@
 from collections.abc import Iterable
+from itertools import chain
 from typing import TYPE_CHECKING, Any
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import polars as pl
 import seaborn as sns
 from anndata import AnnData
 from matplotlib.axes import Axes
 from matplotlib.colors import to_rgb
 from matplotlib.figure import Figure
-from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 from matplotlib_scalebar.scalebar import ScaleBar
 from mpl_toolkits import axes_grid1
 from numba import njit
@@ -78,39 +80,100 @@ class LazyKDE:
 
         self._threads = n_threads
 
+        self._kernel: NDArray[np.float32] | None = None
         self._total_mRNA: NDArray[np.unsignedinteger] | None = None
         self._total_mRNA_KDE: NDArray[np.float32] | None = None
         self._background: NDArray[np.bool_] | None = None
         self._local_maxima: _Local_Max | None = None
         self._celltype_map: NDArray[np.signedinteger] | None = None
         self._cosine_similarity: NDArray[np.float32] | None = None
+        self._assignment_score: NDArray[np.float32] | None = None
         self._celltypes: list[str] | None = None
+
+    @classmethod
+    def from_dataframe(
+        cls, df: pl.DataFrame | pd.DataFrame, *, n_threads: int | None = None, **kwargs
+    ):
+        """
+        Construct a LazyKDE from a DataFrame.
+
+        The DataFrame must provide a 'gene', 'x', and 'y' column. If a 'count' column
+        exists it will be used as counts else a count of 1 (single molecule) per row
+        will be assumed.
+
+        Parameters
+        ----------
+        df : polars.DataFrame | pandas.DataFrame
+        n_threads : int, optional
+            Number of threads used for reading and processing file. If `None` this will
+            default to the number of available CPUs.
+        kwargs
+            Other keyword arguments are passed to
+            :py:meth:`sainsc.GridCounts.from_dataframe`.
+        """
+        if isinstance(df, pd.DataFrame):
+            df = pl.from_pandas(df)
+
+        # TODO ensure dataframe format
+        count_col = ["count"] if "count" in df.columns else []
+
+        df = df.select(
+            pl.col("gene").cast(pl.Categorical), pl.col(["x", "y"] + count_col)
+        )
+        return cls(
+            GridCounts.from_dataframe(df, n_threads=n_threads, **kwargs),
+            n_threads=n_threads,
+        )
 
     ## Kernel
     def gaussian_kernel(
-        self, sigma: float, *, truncate: float = 2, circular: bool = False
+        self,
+        bw: float,
+        *,
+        unit: str = "px",
+        truncate: float = 2,
+        circular: bool = False,
     ):
         """
         Set the kernel used for kernel density estimation (KDE) to gaussian.
 
         Parameters
         ----------
-        sigma : float
+        bw : float
             Bandwidth of the kernel.
+        unit : str
+            Which unit the bandwidth of the kernel is defined in: 'px' or 'um'.
+            'um' requires :py:attr:`sainsc.LazyKDE.resolution` to be set correctly.
         truncate : float, optional
-            The radius for calculating the KDE is calculated as `sigma` * `truncate`.
+            The radius for calculating the KDE is calculated as `bw` * `truncate`.
             Refer to :py:func:`scipy.ndimage.gaussian_filter`.
         circular : bool, optional
             If `True` calculate the KDE using a circular kernel instead of square by
-            setting all values outside the radius `sigma` * `truncate` to 0.
+            setting all values outside the radius `bw` * `truncate` to 0.
+
+        Raises
+        ------
+        ValueError
+            If `unit` is neither 'px' nor 'um'.
+        ValueError
+            If `unit` is 'um' but `resolution` is not set.
 
         See Also
         --------
         :py:meth:`sainsc.LazyKDE.kde`
         """
+
+        if unit == "um":
+            if self.resolution is None:
+                raise ValueError(
+                    "Using `unit`='um' requires the `resolution` to be set."
+                )
+            bw /= self.resolution / 1_000
+        elif unit != "px":
+            raise ValueError("`unit` must be either 'px' or 'um'")
         dtype = np.float32
-        radius = round(truncate * sigma)
-        self.kernel = gaussian_kernel(sigma, radius, dtype=dtype, circular=circular)
+        radius = round(truncate * bw)
+        self.kernel = gaussian_kernel(bw, radius, dtype=dtype, circular=circular)
 
     ## KDE
     def kde(self, gene: str, *, threshold: float | None = None) -> _CsxArray:
@@ -143,6 +206,9 @@ class LazyKDE:
         if isinstance(arr, np.ndarray):
             arr = csr_array(arr)
 
+        if self.kernel is None:
+            raise ValueError("`kernel` must be set before running KDE")
+
         if arr.dtype == np.uint32:
             return sparse_kde_csx_py(arr, self.kernel, threshold=threshold)
         else:
@@ -165,6 +231,11 @@ class LazyKDE:
 
         If :py:attr:`sainsc.LazyKDE.total_mRNA` has not been calculated
         :py:meth:`sainsc.LazyKDE.calculate_total_mRNA` is run first.
+
+        Raises
+        ------
+        ValueError
+            If `self.kernel` is not set.
 
         See Also
         --------
@@ -242,6 +313,8 @@ class LazyKDE:
         ------
         ModuleNotFoundError
             If `spatialdata` is set to `True` but the package is not installed.
+        ValueError
+            If `self.kernel` is not set.
         """
         if self.local_maxima is None:
             raise ValueError("`local_maxima` have to be identified before loading")
@@ -333,6 +406,9 @@ class LazyKDE:
     def _load_KDE_maxima(self, genes: list[str]) -> csc_array | csr_array:
 
         assert self.local_maxima is not None
+        if self.kernel is None:
+            raise ValueError("`kernel` must be set before running KDE")
+
         return kde_at_coord(
             self.counts, genes, self.kernel, self.local_maxima, n_threads=self.n_threads
         )
@@ -342,36 +418,47 @@ class LazyKDE:
         self,
         min_norm: float | dict[str, float],
         min_cosine: float | dict[str, float] | None = None,
+        min_assignment: float | dict[str, float] | None = None,
     ):
         """
-        Assign beads as background.
+        Define pixels as background.
+
+        If using multiple thresholds (e.g. on norm and cosine similarity) they will be
+        combined and pixels are defined as background if they are lower than any of the
+        thresholds.
 
         Parameters
         ----------
         min_norm : float or dict[str, float]
             The threshold for defining background based on
             :py:attr:`sainsc.LazyKDE.total_mRNA_KDE`.
-            Either a float which is used as global threshold or a mapping from cell-types
+            Either a float which is used as global threshold or a mapping from cell types
             to thresholds. Cell-type assignment is needed for cell type-specific thresholds.
         min_cosine : float or dict[str, float], optional
-            The threshold for defining background based on the minimum cosine
-            similarity. Cell type-specific thresholds can be defined as for `min_norm`.
+            The threshold for defining background based on
+            :py:attr:`sainsc.LazyKDE.cosine_similarity`. Cell type-specific thresholds
+            can be defined as for `min_norm`.
+        min_assignment : float or dict[str, float], optional
+            The threshold for defining background based on
+            :py:attr:`sainsc.LazyKDE.assignment_score`. Cell type-specific thresholds
+            can be defined as for `min_norm`.
 
         Raises
         ------
         ValueError
-            If cell type-specific thresholds do not include all cell-types.
+            If cell type-specific thresholds do not include all cell types or if
+            using cell type-specific thresholds before cell type assignment.
         """
 
         @njit
         def _map_celltype_to_value(
-            ct_map: NDArray[np.integer], dict: dict[int, float]
+            ct_map: NDArray[np.integer], thresholds: tuple[float, ...]
         ) -> NDArray[np.floating]:
             values = np.zeros(shape=ct_map.shape, dtype=float)
             for i in range(ct_map.shape[0]):
                 for j in range(ct_map.shape[1]):
                     if ct_map[i, j] >= 0:
-                        values[i, j] = dict[ct_map[i, j]]
+                        values[i, j] = thresholds[ct_map[i, j]]
             return values
 
         if self.total_mRNA_KDE is None:
@@ -386,7 +473,7 @@ class LazyKDE:
                 )
             elif not all([ct in min_norm.keys() for ct in self.celltypes]):
                 raise ValueError("'min_norm' does not contain all celltypes.")
-            idx2threshold = {idx: min_norm[ct] for idx, ct in enumerate(self.celltypes)}
+            idx2threshold = tuple(min_norm[ct] for ct in self.celltypes)
             threshold = _map_celltype_to_value(self.celltype_map, idx2threshold)
             background = self.total_mRNA_KDE < threshold
         else:
@@ -404,13 +491,29 @@ class LazyKDE:
                     )
                 elif not all([ct in min_cosine.keys() for ct in self.celltypes]):
                     raise ValueError("'min_cosine' does not contain all celltypes.")
-                idx2threshold = {
-                    idx: min_cosine[ct] for idx, ct in enumerate(self.celltypes)
-                }
+                idx2threshold = tuple(min_cosine[ct] for ct in self.celltypes)
                 threshold = _map_celltype_to_value(self.celltype_map, idx2threshold)
-                background &= self.cosine_similarity >= threshold
+                background |= self.cosine_similarity <= threshold
             else:
-                background &= self.cosine_similarity >= min_cosine
+                background |= self.cosine_similarity <= min_cosine
+
+        if min_assignment is not None:
+            if self.assignment_score is None:
+                raise ValueError(
+                    "Assignment score threshold can only be used after cell-type assignment"
+                )
+            if isinstance(min_assignment, dict):
+                if self.celltypes is None or self.celltype_map is None:
+                    raise ValueError(
+                        "Cell type-specific threshold can only be used after cell-type assignment"
+                    )
+                elif not all([ct in min_assignment.keys() for ct in self.celltypes]):
+                    raise ValueError("'min_assignment' does not contain all celltypes.")
+                idx2threshold = tuple(min_assignment[ct] for ct in self.celltypes)
+                threshold = _map_celltype_to_value(self.celltype_map, idx2threshold)
+                background |= self.assignment_score <= threshold
+            else:
+                background |= self.assignment_score <= min_assignment
 
         self._background = background
 
@@ -446,12 +549,24 @@ class LazyKDE:
         chunk : tuple[int, int]
             Size of the chunks for processing. Larger chunks require more memory but
             have less duplicated computation.
+
+        Raises
+        ------
+        ValueError
+            If not all genes of the `signatures` are available.
+        ValueError
+            If `self.kernel` is not set.
+        ValueError
+            If `chunk` is smaller than the shape of `self.kernel`.
         """
 
         if not all(signatures.index.isin(self.genes)):
             raise ValueError(
                 "Not all genes in the gene signature are part of this KDE."
             )
+
+        if self.kernel is None:
+            raise ValueError("`kernel` must be set before running KDE")
 
         if not all(s < c for s, c in zip(self.kernel.shape, chunk)):
             raise ValueError("`chunk` must be larger than shape of kernel.")
@@ -471,7 +586,7 @@ class LazyKDE:
 
         fn = self._calculate_cosine_celltype_fn(ct_dtype)
 
-        self._cosine_similarity, self._celltype_map = fn(
+        self._cosine_similarity, self._assignment_score, self._celltype_map = fn(
             self.counts,
             genes,
             signatures_mat,
@@ -496,6 +611,7 @@ class LazyKDE:
     ) -> Figure:
         if remove_background:
             if self.background is not None:
+                img = img.copy()
                 img[self.background] = 0
             else:
                 raise ValueError("`background` is undefined")
@@ -781,8 +897,11 @@ class LazyKDE:
         crop: _RangeTuple2D | None = None,
         scalebar: bool = True,
         cmap: _Cmap = "hls",
+        background: str | tuple = "black",
+        undefined: str | tuple = "grey",
         scalebar_kwargs: dict = _SCALEBAR,
-    ) -> Figure:
+        return_img: bool = False,
+    ) -> Figure | NDArray[np.uint8]:
         """
         Plot the cell-type annotation.
 
@@ -801,15 +920,21 @@ class LazyKDE:
             If it is a list of colors it must have the same length as the number of
             celltypes.
             If it is a dictionary it must be a mapping from celltpye to color. Undefined
-            celltypes are plotted as `'grey'`.
+            celltypes are plotted according to `undefined`.
             Colors can either be provided as string that can be converted via
             :py:func:`matplotlib.colors.to_rgb` or as ``(r, g, b)``-tuple between 0-1.
+        background : str | tuple[float, float, float]
+            Color for the background.
+        undefined : str | tuple[float, float, float]
+            Color used for celltypes without a defined color.
         scalebar_kwargs : dict[str, typing.Any], optional
             Keyword arguments that are passed to ``matplotlib_scalebar.scalebar.ScaleBar``.
+        return_img : bool, optional
+            Return the cell-type map as 3D-array (x, y, RGB) instead of the Figure.
 
         Returns
         -------
-        matplotlib.figure.Figure
+        matplotlib.figure.Figure | numpy.ndarray[numpy.uint8]
 
 
         See Also
@@ -821,7 +946,7 @@ class LazyKDE:
 
         n_celltypes = len(self.celltypes)
 
-        celltype_map = self.celltype_map
+        celltype_map = self.celltype_map.copy()
         if remove_background:
             if self.background is None:
                 raise ValueError("Background has not been filtered.")
@@ -830,6 +955,9 @@ class LazyKDE:
 
         if crop is not None:
             celltype_map = celltype_map[tuple(slice(*c) for c in crop)]
+
+        # shift so 0 will be background
+        celltype_map += 1
 
         if isinstance(cmap, str):
             color_map = sns.color_palette(cmap, n_colors=n_celltypes)
@@ -840,27 +968,22 @@ class LazyKDE:
                     raise ValueError("You need to provide 1 color per celltype")
 
             elif isinstance(cmap, dict):
-                cmap = [cmap.get(cell, "grey") for cell in self.celltypes]
+                cmap = [cmap.get(cell, undefined) for cell in self.celltypes]
 
             color_map = [to_rgb(c) if isinstance(c, str) else c for c in cmap]
 
         # convert to uint8 to reduce memory of final image
         color_map_int = tuple(
-            (np.array(c) * 255).round().astype(np.uint8) for c in color_map
+            (np.array(c) * 255).round().astype(np.uint8)
+            for c in chain([to_rgb(background)], color_map)
         )
         img = _apply_color(celltype_map.T, color_map_int)
 
+        if return_img:
+            return img
+
         legend_elements = [
-            Line2D(
-                [0],
-                [0],
-                marker="o",
-                color="w",
-                label=lbl,
-                markerfacecolor=c,
-                markersize=10,
-            )
-            for c, lbl in zip(color_map, self.celltypes)
+            Patch(color=c, label=lbl) for c, lbl in zip(color_map, self.celltypes)
         ]
 
         fig, ax = plt.subplots()
@@ -928,6 +1051,55 @@ class LazyKDE:
             scalebar_kwargs=scalebar_kwargs,
         )
 
+    def plot_assignment_score(
+        self,
+        *,
+        remove_background: bool = False,
+        crop: _RangeTuple2D | None = None,
+        scalebar: bool = True,
+        im_kwargs: dict = dict(),
+        scalebar_kwargs: dict = _SCALEBAR,
+    ) -> Figure:
+        """
+        Plot the assignment score from cell-type assignment.
+
+        Parameters
+        ----------
+        remove_background : bool, optional
+            If `True`, all pixels for which :py:attr:`sainsc.LazyKDE.background` is
+            `False` are set to 0.
+        crop : tuple[tuple[int, int], tuple[int, int]], optional
+            Coordinates to crop the data defined as `((xmin, xmax), (ymin, ymax))`.
+        scalebar : bool, optional
+            If `True`, add a ``matplotlib_scalebar.scalebar.ScaleBar`` to the plot.
+        im_kwargs : dict[str, typing.Any], optional
+            Keyword arguments that are passed to :py:func:`matplotlib.pyplot.imshow`.
+        scalebar_kwargs : dict[str, typing.Any], optional
+            Keyword arguments that are passed to ``matplotlib_scalebar.scalebar.ScaleBar``.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+
+        See Also
+        --------
+        :py:meth:`sainsc.LazyKDE.assign_celltype`
+        """
+        if self.assignment_score is not None:
+            img = self.assignment_score
+        else:
+            raise ValueError("Cell types have not been assigned")
+
+        return self._plot_2d(
+            img,
+            "Assignment score",
+            remove_background=remove_background,
+            crop=crop,
+            scalebar=scalebar,
+            im_kwargs=im_kwargs,
+            scalebar_kwargs=scalebar_kwargs,
+        )
+
     ## Attributes
     @property
     def n_threads(self) -> int:
@@ -982,7 +1154,7 @@ class LazyKDE:
         self.counts.resolution = resolution
 
     @property
-    def kernel(self) -> np.ndarray:
+    def kernel(self) -> np.ndarray | None:
         """
         numpy.ndarray: Map of the KDE of total mRNA.
 
@@ -991,7 +1163,7 @@ class LazyKDE:
             ValueError
                 If kernel is not a square, 2D :py:class:`numpy.ndarray` of uneven length.
         """
-        return self._kernel.copy()
+        return self._kernel
 
     @kernel.setter
     def kernel(self, kernel: np.ndarray):
@@ -1028,7 +1200,7 @@ class LazyKDE:
         return self._total_mRNA_KDE
 
     @property
-    def background(self) -> NDArray[np.bool] | None:
+    def background(self) -> NDArray[np.bool_] | None:
         """
         numpy.ndarray[numpy.bool]: Map of pixels that are assigned as background.
 
@@ -1042,7 +1214,7 @@ class LazyKDE:
         return self._background
 
     @background.setter
-    def background(self, background: NDArray[np.bool]):
+    def background(self, background: NDArray[np.bool_]):
         if background.shape != self.shape:
             raise ValueError("`background` must have same shape as `self`")
         else:
@@ -1063,6 +1235,18 @@ class LazyKDE:
         return self._cosine_similarity
 
     @property
+    def assignment_score(self) -> NDArray[np.single] | None:
+        """
+        numpy.ndarray[numpy.single]: Assignment score for each pixel.
+
+        Let `x` be the gene expression of a pixel, and `i` and `j` the signatures of the
+        best and 2nd best scoring cell type, respectively. The assignment score is
+        calculated as :math:`\\frac{cos(\\theta_{xi}) - cos(\\theta_{xj})}{cos(\\pi/2 - \\theta_{ij})}`
+        where :math:`\\theta` is the angle between the corresponding vectors.
+        """
+        return self._assignment_score
+
+    @property
     def celltype_map(self) -> NDArray[np.signedinteger] | None:
         """
         numpy.ndarray[numpy.signedinteger]: Cell-type map of cell-type indices.
@@ -1080,6 +1264,8 @@ class LazyKDE:
         ]
         if self.resolution is not None:
             repr.append(f"resolution: {self.resolution} nm / px")
+        if self.kernel is not None:
+            repr.append(f"kernel: {self.kernel.shape}")
         if self.background is not None:
             repr.append("background: set")
         if self.local_maxima is not None:

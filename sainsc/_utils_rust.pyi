@@ -46,7 +46,7 @@ def cosinef32_and_celltypei8(
     log: bool = False,
     chunk_size: tuple[int, int] = (500, 500),
     n_threads: int | None = None,
-) -> tuple[NDArray[np.float32], NDArray[np.int8]]:
+) -> tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.int8]]:
     """
     Calculate the cosine similarity given counts and signatures and assign the most
     similar celltype.
@@ -61,7 +61,7 @@ def cosinef32_and_celltypei16(
     log: bool = False,
     chunk_size: tuple[int, int] = (500, 500),
     n_threads: int | None = None,
-) -> tuple[NDArray[np.float32], NDArray[np.int16]]:
+) -> tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.int16]]:
     """
     Calculate the cosine similarity given counts and signatures and assign the most
     similar celltype.
@@ -87,7 +87,7 @@ class GridCounts:
         """
         Parameters
         ----------
-        counts : dict[str, scipy.sparse.csr_array | scipy.sparse.csr_matrix| scipy.sparse.csc_array| scipy.sparse.csc_matrix]
+        counts : dict[str, scipy.sparse.csr_array | scipy.sparse.csr_matrix | scipy.sparse.csc_array | scipy.sparse.csc_matrix]
             Gene counts.
         resolution : float, optional
             Resolution as nm / pixel.
