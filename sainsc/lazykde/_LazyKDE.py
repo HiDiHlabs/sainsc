@@ -890,7 +890,7 @@ class LazyKDE:
         fig.axes[0].scatter(x, y, **scatter_kwargs)
         return fig
 
-    def plot_celltypemap(
+    def plot_celltype_map(
         self,
         *,
         remove_background: bool = True,
