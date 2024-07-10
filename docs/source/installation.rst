@@ -46,16 +46,22 @@ From GitHub
 -----------
 
 You can install the latest versions directly from
-[GitHub](https://github.com/HiDiHlabs/sainsc). To do so clone the repository using the
+`GitHub <https://github.com/HiDiHlabs/sainsc>`_. To do so clone the repository using the
 ``git clone`` command. Navigate into the downloaded directory and install using
 
 .. code-block:: bash
 
     pip install .
 
+.. note::
+    If you want to to install the package from source (either from GitHub or with
+    ``pip install --no-binary sainsc``) you will need a Rust compiler. You can follow
+    the `official Rust documentation <https://www.rust-lang.org/tools/install>`_ or,
+    if you are using ``conda`` install it via ``conda install conda-forge::rust``.
+
 If you want to install the development version you can install the additional optional
 dependencies with
 
 .. code-block:: bash
 
-    pip install -e '.[dev]'
+    pip install -e .[dev]
