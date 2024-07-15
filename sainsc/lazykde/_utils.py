@@ -16,7 +16,7 @@ from .._utils import _get_coordinate_index
 T = TypeVar("T", bound=np.number)
 U = TypeVar("U", bound=np.bool_ | np.integer)
 
-_SCALEBAR = {"units": "nm", "box_alpha": 0, "color": "w"}
+_SCALEBAR = {"box_alpha": 0, "color": "w"}
 
 
 @njit
