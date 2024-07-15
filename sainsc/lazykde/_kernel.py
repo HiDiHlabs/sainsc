@@ -21,12 +21,7 @@ def _make_circular_kernel(kernel: NDArray[T], radius: int) -> NDArray[T]:
 
 
 def gaussian_kernel(
-    bw: float,
-    radius: int,
-    *,
-    dtype: DTypeLike = np.float32,
-    circular: bool = False,
-    **kwargs,
+    bw: float, radius: int, *, dtype: DTypeLike = np.float32, circular: bool = False
 ) -> NDArray:
     """
     Generate a 2D Gaussian kernel array.
@@ -41,9 +36,6 @@ def gaussian_kernel(
         Datatype of the kernel.
     circular : bool, optional
         Whether to make kernel circular. Values outside `radius` will be set to 0.
-    kwargs :
-        Other keyword arguments will be passed to
-        :py:func:`scipy.ndimage.gaussian_filter`.
 
     Returns
     -------
@@ -54,7 +46,7 @@ def gaussian_kernel(
     dirac = signal.unit_impulse((mask_size, mask_size), idx="mid")
 
     gaussian_kernel = ndimage.gaussian_filter(
-        dirac, bw, output=np.float64, **kwargs
+        dirac, bw, output=np.float64, radius=radius
     ).astype(dtype)
 
     if circular:

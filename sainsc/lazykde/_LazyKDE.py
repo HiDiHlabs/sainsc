@@ -401,6 +401,25 @@ class LazyKDE:
                 )
 
         else:
+            load_attr = [
+                "total_mRNA_KDE",
+                "cosine_similarity",
+                "assignment_score",
+                "celltype_map",
+            ]
+            x, y = adata.obsm["spatial"].T
+            for name in load_attr:
+                if (attr := getattr(self, name)) is not None:
+                    # assert isinstance(attr, np.ndarray)
+                    values = attr[x, y]
+                    if name == "celltype_map":
+                        assert self.celltypes is not None
+                        adata.obs["celltype"] = pd.Categorical.from_codes(
+                            values, self.celltypes
+                        )
+                    else:
+                        adata.obs[name] = values
+
             return adata
 
     def _load_KDE_maxima(self, genes: list[str]) -> csc_array | csr_array:
@@ -890,7 +909,7 @@ class LazyKDE:
         fig.axes[0].scatter(x, y, **scatter_kwargs)
         return fig
 
-    def plot_celltypemap(
+    def plot_celltype_map(
         self,
         *,
         remove_background: bool = True,
