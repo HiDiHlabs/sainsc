@@ -82,3 +82,7 @@ plugins                = "numpy.typing.mypy_plugin"
 
 [tool.codespell]
 ignore-words-list = "coo,crate"
+
+[tool.cibuildwheel]
+archs = 'auto64'
+# build = 'cp310-*'
