@@ -62,8 +62,7 @@ repository    = "https://github.com/HiDiHlabs/sainsc"
 zip-safe = false
 
 [tool.setuptools.packages.find]
-# TODO improve
-include = ["sainsc", "sainsc.io", "sainsc.lazykde"]
+include = ["sainsc", "sainsc.io", "sainsc.lazykde", "sainsc.utils"]
 
 [tool.setuptools_scm]
 
