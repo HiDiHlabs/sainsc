@@ -91,3 +91,6 @@ ignore-words-list = "coo,crate"
 [tool.cibuildwheel]
 archs = 'auto64'
 # build = 'cp310-*'
+[tool.cibuildwheel.linux]
+# cibuildwheel runs linux in containers so we need to install rust there
+before-all = "curl -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y"
