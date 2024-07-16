@@ -26,7 +26,10 @@ extensions = [
     "sphinx.ext.napoleon",
     "autoapi.extension",
     "sphinx.ext.mathjax",
+    "myst_nb",
 ]
+
+nb_execution_mode = "off"
 
 
 autodoc_typehints = "none"

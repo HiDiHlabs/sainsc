@@ -8,7 +8,7 @@ The data can be filtered, subset, and cropped to adjust the desired field of vie
 genes.
 
 In the next step the kernel for kernel density estimation (KDE) is defined and
-cell types are assigned to each pixel using cell type gene
+cell types are assigned to each pixel using cell-type gene
 expression signatures from e.g. single-cell RNAseq.
 
 Otherwise you can find the local maxima of the KDE and treat these as proxies for cells.
@@ -19,5 +19,5 @@ spatial methods (e.g. using `scanpy <https://scanpy.readthedocs.io/en/stable/>`_
 Along the way you will want to (and should) generate a lot of plots to check your
 results.
 
-For a more concrete example of what a workflow can look like we will provide example
-notebooks soon.
+For a more concrete example of what a workflow looks like check out the
+:doc:`usage` guide.

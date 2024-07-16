@@ -653,7 +653,7 @@ class LazyKDE:
     def _add_scalebar(self, ax: Axes, **kwargs):
         if self.counts.resolution is None:
             raise ValueError("'resolution' must be set when using scalebar")
-        ax.add_artist(ScaleBar(self.counts.resolution, **kwargs))
+        ax.add_artist(ScaleBar(self.counts.resolution, units="nm", **kwargs))
 
     def plot_genecount_histogram(self, **kwargs) -> Figure:
         """
