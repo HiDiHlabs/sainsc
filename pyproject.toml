@@ -21,7 +21,7 @@ dependencies = [
     "numba>=0.44",
     "numpy>=1.21",
     "pandas",
-    "polars[pandas]",
+    "polars[pandas]>=1",
     "scikit-image>=0.18",
     "scipy>=1.9",
     "seaborn>=0.11",

@@ -83,7 +83,7 @@ def read_gem_file(
 
     path = Path(filepath)
 
-    columns = pl.read_csv(path, separator=sep, comment_char="#", n_rows=0).columns
+    columns = pl.read_csv(path, separator=sep, comment_prefix="#", n_rows=0).columns
     count_col = None
     for name in get_args(_Count_ColName):
         if name in columns:
@@ -98,7 +98,7 @@ def read_gem_file(
     df = pl.read_csv(
         path,
         separator=sep,
-        comment_char="#",
+        comment_prefix="#",
         dtypes={
             "geneID": pl.Categorical,
             "x": pl.Int32,
