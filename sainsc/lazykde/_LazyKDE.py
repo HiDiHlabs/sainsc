@@ -198,16 +198,16 @@ class LazyKDE:
         return self._kde(self.counts[gene], threshold)
 
     def _kde(self, arr: NDArray | _Csx, threshold: float | None = None) -> _CsxArray:
-        # TODO use ndimage.gaussian_filter for "dense" arrays?
-        # ndimage.gaussian_filter(arr, sigma, mode="constant", cval=0, truncate=2)
+        if self.kernel is None:
+            raise ValueError("`kernel` must be set before running KDE")
+
         if threshold is None:
             threshold = 0
 
         if isinstance(arr, np.ndarray):
+            # scipy.ndimage.convolve could be used for dense arrays but seems to be
+            # slower than converting to sparse and running custom kde
             arr = csr_array(arr)
-
-        if self.kernel is None:
-            raise ValueError("`kernel` must be set before running KDE")
 
         if arr.dtype == np.uint32:
             return sparse_kde_csx_py(arr, self.kernel, threshold=threshold)
@@ -244,9 +244,8 @@ class LazyKDE:
         """
         if self.total_mRNA is None or self.total_mRNA.shape != self.shape:
             self.calculate_total_mRNA()
-        total_mRNA_counts = self.total_mRNA
-        assert total_mRNA_counts is not None
-        self._total_mRNA_KDE = self._kde(total_mRNA_counts).toarray()
+        assert self.total_mRNA is not None
+        self._total_mRNA_KDE = self._kde(self.total_mRNA).toarray()
 
     ## Local maxima / cell proxies
     def find_local_maxima(self, min_dist: int, min_area: int = 0):
