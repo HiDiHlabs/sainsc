@@ -20,7 +20,7 @@ use std::{
 macro_rules! build_cos_ct_fn {
     ($name:tt, $t_cos:ty, $t_ct:ty) => {
         #[pyfunction]
-        #[pyo3(signature = (counts, genes, signatures, kernel, *, log=false, chunk_size=(500, 500), n_threads=None))]
+        #[pyo3(signature = (counts, genes, signatures, kernel, *, log=false, low_memory=true, chunk_size=(500, 500), n_threads=None))]
         /// calculate cosine similarity and assign celltype
         pub fn $name<'py>(
             py: Python<'py>,
@@ -29,10 +29,14 @@ macro_rules! build_cos_ct_fn {
             signatures: PyReadonlyArray2<'py, $t_cos>,
             kernel: PyReadonlyArray2<'py, $t_cos>,
             log: bool,
+            low_memory: bool,
             chunk_size: (usize, usize),
             n_threads: Option<usize>,
-        ) -> PyResult<(Bound<'py, PyArray2<$t_cos>>, Bound<'py, PyArray2<$t_cos>>, Bound<'py, PyArray2<$t_ct>>)> {
-
+        ) -> PyResult<(
+            Bound<'py, PyArray2<$t_cos>>,
+            Bound<'py, PyArray2<$t_cos>>,
+            Bound<'py, PyArray2<$t_ct>>,
+        )> {
             // ensure that all count arrays are CSR
             counts.to_format(CSR);
             let gene_counts: Vec<_> = genes
@@ -50,6 +54,7 @@ macro_rules! build_cos_ct_fn {
                 kernel.as_array(),
                 counts.shape,
                 log,
+                low_memory,
                 chunk_size,
                 n_threads.unwrap_or(0),
             );
@@ -75,6 +80,7 @@ fn chunk_and_calculate_cosine<'a, C, I, F, U>(
     kernel: ArrayView2<'a, F>,
     shape: (usize, usize),
     log: bool,
+    low_memory: bool,
     chunk_size: (usize, usize),
     n_threads: usize,
 ) -> Result<(Array2<F>, Array2<F>, Array2<U>), Box<dyn Error>>
@@ -115,64 +121,129 @@ where
             }
         });
 
-    let mut cosine_rows = Vec::with_capacity(m);
-    let mut score_rows = Vec::with_capacity(m);
-    let mut celltype_rows = Vec::with_capacity(m);
+    let (cosine, score, celltype) = pool.install(|| {
+        if low_memory {
+            let mut cosine = Vec::with_capacity(m * n);
+            let mut score = Vec::with_capacity(m * n);
+            let mut celltype = Vec::with_capacity(m * n);
 
-    pool.install(|| {
-        for i in 0..m {
-            let (slice_row, unpad_row) = chunk_(i, srow, nrow, padrow);
-            let row_chunk: Vec<_> = counts
-                .par_iter()
-                .map(|c| {
-                    c.slice_outer(slice_row.clone())
-                        .transpose_view()
-                        .to_other_storage()
-                })
-                .collect();
+            for i in 0..m {
+                let (slice_row, unpad_row) = chunk_(i, srow, nrow, padrow);
+                let row_chunk: Vec<_> = counts
+                    .par_iter()
+                    .map(|c| {
+                        c.slice_outer(slice_row.clone())
+                            .transpose_view()
+                            .to_other_storage()
+                    })
+                    .collect();
 
-            let ((cosine_cols, score_cols), celltype_cols): (
-                (Vec<Array2<F>>, Vec<Array2<F>>),
-                Vec<Array2<U>>,
-            ) = (0..n)
+                let ((cosine_cols, score_cols), celltype_cols): (
+                    (Vec<Array2<F>>, Vec<Array2<F>>),
+                    Vec<Array2<U>>,
+                ) = (0..n)
+                    .into_par_iter()
+                    .map(|j| {
+                        let (slice_col, unpad_col) = chunk_(j, scol, ncol, padcol);
+
+                        let chunk = row_chunk
+                            .par_iter()
+                            .map(|c| c.slice_outer(slice_col.clone()).transpose_into().to_owned())
+                            .collect();
+
+                        cosine_and_celltype_(
+                            chunk,
+                            signatures,
+                            signature_similarity_correction.view(),
+                            kernel,
+                            (unpad_row.clone(), unpad_col),
+                            log,
+                        )
+                    })
+                    .unzip();
+                cosine.extend(cosine_cols);
+                score.extend(score_cols);
+                celltype.extend(celltype_cols);
+            }
+            (cosine, score, celltype)
+        } else {
+            let chunk_info: (Vec<_>, Vec<_>) = (0..m)
                 .into_par_iter()
-                .map(|j| {
-                    let (slice_col, unpad_col) = chunk_(j, scol, ncol, padcol);
+                .map(|i| {
+                    let (slice_row, unpad_row) = chunk_(i, srow, nrow, padrow);
 
-                    let chunk = row_chunk
+                    let row_chunk: Vec<_> = counts
                         .par_iter()
-                        .map(|c| c.slice_outer(slice_col.clone()).transpose_into().to_owned())
+                        .map(|c| {
+                            c.slice_outer(slice_row.clone())
+                                .transpose_view()
+                                .to_other_storage()
+                        })
                         .collect();
+                    (0..n)
+                        .into_par_iter()
+                        .map(|j| {
+                            let (slice_col, unpad_col) = chunk_(j, scol, ncol, padcol);
 
-                    cosine_and_celltype_(
-                        chunk,
-                        signatures,
-                        signature_similarity_correction.view(),
-                        kernel,
-                        (unpad_row.clone(), unpad_col),
-                        log,
-                    )
+                            let chunk = row_chunk
+                                .par_iter()
+                                .map(|c| {
+                                    c.slice_outer(slice_col.clone()).transpose_into().to_owned()
+                                })
+                                .collect::<Vec<_>>();
+                            ((unpad_row.clone(), unpad_col), chunk)
+                        })
+                        .collect::<Vec<_>>()
                 })
+                .flatten()
                 .unzip();
-            cosine_rows.push(concat_1d(cosine_cols, 1));
-            score_rows.push(concat_1d(score_cols, 1));
-            celltype_rows.push(concat_1d(celltype_cols, 1));
+
+            let ((cosine, score), celltype): ((Vec<Array2<F>>, Vec<Array2<F>>), Vec<Array2<U>>) =
+                chunk_info
+                    .into_par_iter()
+                    .map(|(unpad, chunk)| {
+                        cosine_and_celltype_(
+                            chunk,
+                            signatures,
+                            signature_similarity_correction.view(),
+                            kernel,
+                            unpad,
+                            log,
+                        )
+                    })
+                    .unzip();
+            (cosine, score, celltype)
         }
     });
 
-    let cosine = concat_1d(cosine_rows.into_iter().collect::<Result<Vec<_>, _>>()?, 0)?;
-    let score = concat_1d(score_rows.into_iter().collect::<Result<Vec<_>, _>>()?, 0)?;
-    let celltype = concat_1d(celltype_rows.into_iter().collect::<Result<Vec<_>, _>>()?, 0)?;
+    // concatenate all chunks back to original shape
+    let cosine = concat_2d(&cosine, n)?;
+    let score = concat_2d(&score, n)?;
+    let celltype = concat_2d(&celltype, n)?;
+
     Ok((cosine, score, celltype))
 }
 
 fn concat_1d<T: Clone + Sync + Send>(
-    chunks: Vec<Array2<T>>,
+    chunks: &[Array2<T>],
     axis: usize,
 ) -> Result<Array2<T>, ShapeError> {
     concatenate(
         Axis(axis),
         &chunks.par_iter().map(|a| a.view()).collect::<Vec<_>>(),
+    )
+}
+
+fn concat_2d<T: Clone + Sync + Send>(
+    chunks: &[Array2<T>],
+    size: usize,
+) -> Result<Array2<T>, ShapeError> {
+    concat_1d(
+        &(chunks
+            .chunks(size)
+            .map(|col| concat_1d(col, 1))
+            .collect::<Result<Vec<_>, _>>()?),
+        0,
     )
 }
 

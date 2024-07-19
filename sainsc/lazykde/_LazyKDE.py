@@ -549,6 +549,7 @@ class LazyKDE:
         signatures: pd.DataFrame,
         *,
         log: bool = False,
+        low_memory: bool = True,
         chunk: tuple[int, int] = (500, 500),
     ):
         """
@@ -564,6 +565,10 @@ class LazyKDE:
         log : bool
             Whether to log transform the KDE when calculating the cosine similarity.
             This is useful if the gene signatures are derived from log-transformed data.
+        low_memory : bool
+            Setting `low_memory` to False may speed up cell-type assignment, especially
+            when using a large number of threads. The memory usage should not be more
+            than twice as high and the increase generally is small when using few genes.
         chunk : tuple[int, int]
             Size of the chunks for processing. Larger chunks require more memory but
             have less duplicated computation.
@@ -610,6 +615,7 @@ class LazyKDE:
             signatures_mat,
             self.kernel,
             log=log,
+            low_memory=low_memory,
             chunk_size=chunk,
             n_threads=self.n_threads,
         )
