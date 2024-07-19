@@ -76,41 +76,32 @@ def read_gem_file(
     ValueError
         If count column has an unknown name.
     """
+    # according to specification the name should be MIDCount
+    # however the datasets published in the original Stereo-seq publication used
+    # various names for the count column
     _Count_ColName = Literal["MIDCounts", "MIDCount", "UMICount"]
+    options = get_args(_Count_ColName)
 
     if n_threads is None:
         n_threads = _get_n_cpus()
 
-    path = Path(filepath)
-
-    columns = pl.read_csv(path, separator=sep, comment_prefix="#", n_rows=0).columns
-    count_col = None
-    for name in get_args(_Count_ColName):
-        if name in columns:
-            count_col = name
-            break
-
-    if count_col is None:
-        options = get_args(_Count_ColName)
-        raise ValueError(
-            f"Unknown count column, the name of the column must be one of {options}"
-        )
     df = pl.read_csv(
-        path,
+        Path(filepath),
         separator=sep,
         comment_prefix="#",
-        dtypes={
-            "geneID": pl.Categorical,
-            "x": pl.Int32,
-            "y": pl.Int32,
-            count_col: pl.UInt32,
-        },
+        schema_overrides={"geneID": pl.Categorical, "x": pl.Int32, "y": pl.Int32}
+        | {n: pl.UInt32 for n in options},
         n_threads=n_threads,
         **kwargs,
     )
-    df = df.rename({count_col: "count", "geneID": "gene"})
 
-    return df
+    for name in options:
+        if name in df.columns:
+            return df.rename({name: "count", "geneID": "gene"})
+
+    raise ValueError(
+        f"Unknown count column, the name of the column must be one of {options}"
+    )
 
 
 def read_StereoSeq(
