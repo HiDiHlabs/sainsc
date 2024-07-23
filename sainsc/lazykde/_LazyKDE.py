@@ -567,8 +567,7 @@ class LazyKDE:
             This is useful if the gene signatures are derived from log-transformed data.
         low_memory : bool
             Setting `low_memory` to False may speed up cell-type assignment, especially
-            when using a large number of threads. The memory usage should not be more
-            than twice as high and the increase generally is small when using few genes.
+            when using a large number of threads.
         chunk : tuple[int, int]
             Size of the chunks for processing. Larger chunks require more memory but
             have less duplicated computation.
