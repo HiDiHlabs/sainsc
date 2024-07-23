@@ -335,6 +335,7 @@ where
         .for_each(|ct, cos, s, &norm| {
             if norm == zero() {
                 *ct = -one::<I>();
+                *s = zero();
             } else {
                 let norm_sqrt = norm.sqrt();
                 *cos /= norm_sqrt;
