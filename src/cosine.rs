@@ -6,7 +6,7 @@ use ndarray::{
     concatenate, s, Array2, Array3, ArrayView1, ArrayView2, Axis, NdFloat, NewAxis, ShapeError,
     Slice, Zip,
 };
-use num::{one, zero, NumCast, PrimInt, Signed, Zero};
+use num::{one, zero, NumCast, PrimInt, Signed};
 use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
 use pyo3::{exceptions::PyValueError, prelude::*};
 use rayon::prelude::*;
@@ -14,7 +14,7 @@ use sprs::{CompressedStorage::CSR, CsMatI, CsMatViewI, SpIndex};
 use std::{
     cmp::{max, min},
     error::Error,
-    ops::{Range, Sub},
+    ops::Range,
 };
 
 macro_rules! build_cos_ct_fn {
@@ -74,10 +74,10 @@ macro_rules! build_cos_ct_fn {
 build_cos_ct_fn!(cosinef32_and_celltypei8, f32, i8);
 build_cos_ct_fn!(cosinef32_and_celltypei16, f32, i16);
 
-fn chunk_and_calculate_cosine<'a, C, I, F, U>(
-    counts: &[CsMatViewI<'a, C, I>],
-    signatures: ArrayView2<'a, F>,
-    kernel: ArrayView2<'a, F>,
+fn chunk_and_calculate_cosine<C, I, F, U>(
+    counts: &[CsMatViewI<C, I>],
+    signatures: ArrayView2<F>,
+    kernel: ArrayView2<F>,
     shape: (usize, usize),
     log: bool,
     low_memory: bool,
@@ -154,7 +154,7 @@ where
                         cosine_and_celltype_(
                             chunk,
                             signatures,
-                            signature_similarity_correction.view(),
+                            &signature_similarity_correction,
                             kernel,
                             (unpad_row.clone(), unpad_col),
                             log,
@@ -195,7 +195,7 @@ where
                         cosine_and_celltype_(
                             chunk,
                             signatures,
-                            signature_similarity_correction.view(),
+                            &signature_similarity_correction,
                             kernel,
                             unpad,
                             log,
@@ -247,11 +247,11 @@ fn chunk_(i: usize, step: usize, n: usize, pad: usize) -> (Range<usize>, Range<u
     (chunk_pad, chunk_unpad)
 }
 
-fn cosine_and_celltype_<'a, C, I, F, U>(
+fn cosine_and_celltype_<C, I, F, U>(
     counts: Vec<CsMatI<C, I>>,
-    signatures: ArrayView2<'a, F>,
-    pairwise_correction: ArrayView2<F>,
-    kernel: ArrayView2<'a, F>,
+    signatures: ArrayView2<F>,
+    pairwise_correction: &Array2<F>,
+    kernel: ArrayView2<F>,
     unpad: (Range<usize>, Range<usize>),
     log: bool,
 ) -> ((Array2<F>, Array2<F>), Array2<U>)
@@ -317,7 +317,7 @@ where
 fn get_max_cosine_and_celltype<F, I>(
     cosine: Array3<F>,
     kde_norm: Array2<F>,
-    pairwise_correction: ArrayView2<F>,
+    pairwise_correction: &Array2<F>,
 ) -> ((Array2<F>, Array2<F>), Array2<I>)
 where
     I: PrimInt + Signed,
@@ -346,9 +346,9 @@ where
     ((max_cosine, score), celltypemap)
 }
 
-fn get_argmax2<'a, T: NdFloat>(
-    values: ArrayView1<'a, T>,
-    pairwise_correction: ArrayView2<T>,
+fn get_argmax2<T: NdFloat>(
+    values: ArrayView1<T>,
+    pairwise_correction: &Array2<T>,
 ) -> (T, T, usize) {
     let mut max = zero();
     let mut max2 = zero();
