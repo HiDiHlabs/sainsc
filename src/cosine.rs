@@ -323,32 +323,32 @@ where
     I: PrimInt + Signed,
     F: NdFloat,
 {
-    let vars = cosine.map_axis(Axis(0), |view| get_argmax2(view));
-    let mut max_cosine = vars.mapv(|(c, _, _, _)| c);
-    let mut score = vars.mapv(|(_, s, _, _)| s);
-    let mut celltypemap = vars.mapv(|(_, _, i, _)| I::from(i).unwrap());
+    let vars = cosine.map_axis(Axis(0), |view| get_argmax2(view, pairwise_correction));
+    let mut max_cosine = vars.mapv(|(c, _, _)| c);
+    let mut score = vars.mapv(|(_, s, _)| s);
+    let mut celltypemap = vars.mapv(|(_, _, i)| I::from(i).unwrap());
 
     Zip::from(&mut celltypemap)
         .and(&mut max_cosine)
         .and(&mut score)
-        .and(&vars)
         .and(&kde_norm)
-        .for_each(|ct, cos, s, (_, _, i, j), &norm| {
+        .for_each(|ct, cos, s, &norm| {
             if norm == zero() {
                 *ct = -one::<I>();
             } else {
                 let norm_sqrt = norm.sqrt();
                 *cos /= norm_sqrt;
-                *s /= norm_sqrt * pairwise_correction[[*i, *j]];
+                *s /= norm_sqrt;
             };
         });
 
     ((max_cosine, score), celltypemap)
 }
 
-fn get_argmax2<'a, T: Zero + PartialOrd + Copy + Sub<Output = T>>(
+fn get_argmax2<'a, T: NdFloat>(
     values: ArrayView1<'a, T>,
-) -> (T, T, usize, usize) {
+    pairwise_correction: ArrayView2<T>,
+) -> (T, T, usize) {
     let mut max = zero();
     let mut max2 = zero();
 
@@ -368,7 +368,8 @@ fn get_argmax2<'a, T: Zero + PartialOrd + Copy + Sub<Output = T>>(
             }
         }
     }
-    (max, max - max2, argmax, argmax2)
+    let score = (max - max2) / pairwise_correction[[argmax, argmax2]];
+    (max, score, argmax)
 }
 
 #[cfg(test)]
