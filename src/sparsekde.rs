@@ -9,10 +9,10 @@ use numpy::{PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
 use pyo3::{exceptions::PyRuntimeError, prelude::*};
 use rayon::{iter::ParallelIterator, prelude::ParallelSlice, ThreadPoolBuildError};
-use sprs::{hstack, CsMatI, CsMatViewI, SpIndex};
+use sprs::{hstack, CsMatBase, CsMatI, CsMatViewI, SpIndex};
 use std::{
     cmp::{max, min},
-    ops::Range,
+    ops::{Deref, Range},
 };
 
 type KDEPrecision = f32;
@@ -28,7 +28,7 @@ macro_rules! build_kde_csx_fn {
             kernel: PyReadonlyArray2<'py, KDEPrecision>,
             threshold: KDEPrecision,
         ) -> PyResult<WrappedCsx<KDEPrecision, $t_index, $t_index>> {
-            let sparse_kde = sparse_kde_csx(counts.0.view(), kernel.as_array(), threshold);
+            let sparse_kde = sparse_kde_csx(&counts.0, kernel.as_array(), threshold);
             Ok(WrappedCsx(sparse_kde))
         }
     };
@@ -74,15 +74,15 @@ fn in_bounds_range<I: Signed + PrimInt>(n: I, i: I, pad: I) -> (I, I) {
     (max(-i, -pad), min(n - i, pad + one()))
 }
 
-fn sparse_kde_csx<'a, C, I, I2, F>(
-    counts: CsMatViewI<'a, C, I, I2>,
-    kernel: ArrayView2<'a, F>,
+fn sparse_kde_csx<C, I, Iptr, F>(
+    counts: &CsMatI<C, I, Iptr>,
+    kernel: ArrayView2<F>,
     threshold: F,
 ) -> CsMatI<F, I>
 where
     C: NumCast + Copy,
     I: SpIndex + Signed,
-    I2: SpIndex,
+    Iptr: SpIndex,
     F: NdFloat + Signed,
     Slice: From<Range<I>>,
 {
@@ -91,17 +91,19 @@ where
     CsMatI::csr_from_dense(ArrayView2::from(&kde), threshold)
 }
 
-pub fn sparse_kde_csx_<'a, 'b, C, I, I2, F>(
+pub fn sparse_kde_csx_<C, I, Iptr, IptrStorage, IndStorage, DataStorage, F>(
     kde: &mut Array2<F>,
-    counts: CsMatViewI<'a, C, I, I2>,
-    kernel: ArrayView2<'b, F>,
+    counts: &CsMatBase<C, I, IptrStorage, IndStorage, DataStorage, Iptr>,
+    kernel: ArrayView2<F>,
 ) where
     C: NumCast + Copy,
     I: SpIndex + Signed,
-    I2: SpIndex,
+    Iptr: SpIndex,
     F: NdFloat,
     Slice: From<Range<I>>,
-    'b: 'a,
+    IptrStorage: Deref<Target = [Iptr]>,
+    IndStorage: Deref<Target = [I]>,
+    DataStorage: Deref<Target = [C]>,
 {
     let shape = kde.shape();
     let (m, n) = (I::from(shape[0]).unwrap(), I::from(shape[1]).unwrap());
@@ -130,10 +132,10 @@ pub fn sparse_kde_csx_<'a, 'b, C, I, I2, F>(
     })
 }
 
-fn kde_at_coord_<'a, C, I, F, I2>(
-    counts: &[CsMatViewI<'a, C, I>],
-    kernel: ArrayView2<'a, F>,
-    coordinates: (ArrayView1<'a, I2>, ArrayView1<'a, I2>),
+fn kde_at_coord_<C, I, F, I2>(
+    counts: &[CsMatViewI<C, I>],
+    kernel: ArrayView2<F>,
+    coordinates: (ArrayView1<I2>, ArrayView1<I2>),
     n_threads: usize,
 ) -> Result<CsMatI<F, usize>, ThreadPoolBuildError>
 where
@@ -163,7 +165,7 @@ where
             .map(|counts_batch| {
                 let mut kde_buffer = Array2::zeros(shape);
                 let mut kde_coords_batch = Vec::with_capacity(counts_batch.len());
-                for &c in counts_batch {
+                for c in counts_batch {
                     sparse_kde_csx_(&mut kde_buffer, c, kernel);
                     kde_coords_batch.push(get_coord(kde_buffer.view(), (&coord_x, &coord_y)));
                 }
@@ -179,7 +181,7 @@ where
 }
 
 fn get_coord<T: Zero + Copy + PartialOrd + Signed>(
-    arr: ArrayView2<'_, T>,
+    arr: ArrayView2<T>,
     coordinates: (&[usize], &[usize]),
 ) -> CsMatI<T, usize> {
     let mut out = Array1::zeros(coordinates.0.len());
@@ -253,7 +255,7 @@ mod tests {
     fn test_sparse_kde_csx() {
         let setup = Setup::new();
 
-        let kde = sparse_kde_csx(setup.counts.view(), setup.kernel.view(), setup.threshold);
+        let kde = sparse_kde_csx(&setup.counts, setup.kernel.view(), setup.threshold);
 
         assert_eq!(kde, setup.kde);
     }

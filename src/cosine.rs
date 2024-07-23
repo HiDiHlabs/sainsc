@@ -281,7 +281,7 @@ where
             let shape = csx.shape();
             let mut kde = Array2::zeros(shape);
 
-            sparse_kde_csx_(&mut kde, csx.view(), kernel);
+            sparse_kde_csx_(&mut kde, &csx, kernel);
             if log {
                 kde.mapv_inplace(F::ln_1p);
             }
@@ -293,7 +293,7 @@ where
                 * &weights.slice(s![.., NewAxis, NewAxis]);
 
             for (csx, weights) in csx_weights_iter {
-                sparse_kde_csx_(&mut kde, csx.view(), kernel);
+                sparse_kde_csx_(&mut kde, &csx, kernel);
                 let mut kde_unpadded = kde.slice_mut(s![unpad_r.clone(), unpad_c.clone()]);
                 if log {
                     kde_unpadded.mapv_inplace(F::ln_1p);
