@@ -167,36 +167,26 @@ where
             }
             (cosine, score, celltype)
         } else {
-            let chunk_info: (Vec<_>, Vec<_>) = (0..m)
-                .into_par_iter()
-                .map(|i| {
-                    let (slice_row, unpad_row) = chunk_(i, srow, nrow, padrow);
-
-                    let row_chunk: Vec<_> = counts
+            let mut chunk_info = Vec::with_capacity(m * n);
+            for i in 0..m {
+                let (slice_row, unpad_row) = chunk_(i, srow, nrow, padrow);
+                let row_chunk: Vec<_> = counts
+                    .par_iter()
+                    .map(|c| {
+                        c.slice_outer(slice_row.clone())
+                            .transpose_view()
+                            .to_other_storage()
+                    })
+                    .collect();
+                for j in 0..n {
+                    let (slice_col, unpad_col) = chunk_(j, scol, ncol, padcol);
+                    let chunk: Vec<_> = row_chunk
                         .par_iter()
-                        .map(|c| {
-                            c.slice_outer(slice_row.clone())
-                                .transpose_view()
-                                .to_other_storage()
-                        })
+                        .map(|c| c.slice_outer(slice_col.clone()).transpose_into().to_owned())
                         .collect();
-                    (0..n)
-                        .into_par_iter()
-                        .map(|j| {
-                            let (slice_col, unpad_col) = chunk_(j, scol, ncol, padcol);
-
-                            let chunk = row_chunk
-                                .par_iter()
-                                .map(|c| {
-                                    c.slice_outer(slice_col.clone()).transpose_into().to_owned()
-                                })
-                                .collect::<Vec<_>>();
-                            ((unpad_row.clone(), unpad_col), chunk)
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .flatten()
-                .unzip();
+                    chunk_info.push(((unpad_row.clone(), unpad_col), chunk));
+                }
+            }
 
             let ((cosine, score), celltype): ((Vec<Array2<F>>, Vec<Array2<F>>), Vec<Array2<U>>) =
                 chunk_info
