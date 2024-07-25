@@ -11,11 +11,7 @@ use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
 use pyo3::{exceptions::PyValueError, prelude::*};
 use rayon::prelude::*;
 use sprs::{CompressedStorage::CSR, CsMatI, CsMatViewI, SpIndex};
-use std::{
-    cmp::{max, min},
-    error::Error,
-    ops::Range,
-};
+use std::{cmp::min, error::Error, ops::Range};
 
 macro_rules! build_cos_ct_fn {
     ($name:tt, $t_cos:ty, $t_ct:ty) => {
@@ -128,7 +124,7 @@ where
             let mut celltype = Vec::with_capacity(m * n);
 
             for i in 0..m {
-                let (slice_row, unpad_row) = chunk_(i, srow, nrow, padrow);
+                let (slice_row, unpad_row) = chunk_ranges(i, srow, nrow, padrow);
                 let row_chunk: Vec<_> = counts
                     .par_iter()
                     .map(|c| {
@@ -144,7 +140,7 @@ where
                 ) = (0..n)
                     .into_par_iter()
                     .map(|j| {
-                        let (slice_col, unpad_col) = chunk_(j, scol, ncol, padcol);
+                        let (slice_col, unpad_col) = chunk_ranges(j, scol, ncol, padcol);
 
                         let chunk = row_chunk
                             .par_iter()
@@ -169,7 +165,7 @@ where
         } else {
             let mut chunk_info = Vec::with_capacity(m * n);
             for i in 0..m {
-                let (slice_row, unpad_row) = chunk_(i, srow, nrow, padrow);
+                let (slice_row, unpad_row) = chunk_ranges(i, srow, nrow, padrow);
                 let row_chunk: Vec<_> = counts
                     .par_iter()
                     .map(|c| {
@@ -179,7 +175,7 @@ where
                     })
                     .collect();
                 for j in 0..n {
-                    let (slice_col, unpad_col) = chunk_(j, scol, ncol, padcol);
+                    let (slice_col, unpad_col) = chunk_ranges(j, scol, ncol, padcol);
                     let chunk: Vec<_> = row_chunk
                         .par_iter()
                         .map(|c| c.slice_outer(slice_col.clone()).transpose_into().to_owned())
@@ -237,13 +233,12 @@ fn concat_2d<T: Clone + Sync + Send>(
     )
 }
 
-fn chunk_(i: usize, step: usize, n: usize, pad: usize) -> (Range<usize>, Range<usize>) {
-    let bound1 = (i * step) as isize;
-    let bound2 = (i + 1) * step;
-    let start = max(0, bound1 - pad as isize) as usize;
-    let start2 = max(0, bound1 - start as isize) as usize;
-    let chunk_pad = start..min(n, bound2 + pad);
-    let chunk_unpad = start2..(start2 + min(step, (n as isize - bound1) as usize));
+fn chunk_ranges(i: usize, step: usize, n: usize, pad: usize) -> (Range<usize>, Range<usize>) {
+    let start_raw = min(n, i * step);
+    let start_pad = start_raw.saturating_sub(pad);
+    let start_unpad = start_raw.saturating_sub(start_pad);
+    let chunk_pad = start_pad..min(n, (i + 1) * step + pad);
+    let chunk_unpad = start_unpad..(start_unpad + min(step, n - start_raw));
     (chunk_pad, chunk_unpad)
 }
 
