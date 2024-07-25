@@ -368,52 +368,52 @@ fn get_argmax2<T: NdFloat>(
     (max, score, argmax)
 }
 
-#[cfg(test)]
-mod tests {
+// #[cfg(test)]
+// mod tests {
 
-    use super::*;
-    use ndarray::array;
+//     use super::*;
+//     use ndarray::array;
 
-    struct Setup {
-        cosine: Array3<f64>,
-        norm: Array2<f64>,
-        max: Array2<f64>,
-        argmax: Array2<i8>,
-        cos: Array2<f64>,
-        celltype: Array2<i8>,
-    }
+//     struct Setup {
+//         cosine: Array3<f64>,
+//         norm: Array2<f64>,
+//         max: Array2<f64>,
+//         argmax: Array2<i8>,
+//         cos: Array2<f64>,
+//         celltype: Array2<i8>,
+//     }
 
-    impl Setup {
-        fn new() -> Self {
-            Self {
-                cosine: array![[[1.0, 0.0, 0.0]], [[0.5, 1.0, 0.0]]],
-                norm: array![[4.0, 1.0, 0.0]],
-                max: array![[1.0, 1.0, 0.0]],
-                argmax: array![[0, 1, 0]],
-                cos: array![[0.5, 1.0, 0.0]],
-                celltype: array![[0, 1, -1]],
-            }
-        }
-    }
+//     impl Setup {
+//         fn new() -> Self {
+//             Self {
+//                 cosine: array![[[1.0, 0.0, 0.0]], [[0.5, 1.0, 0.0]]],
+//                 norm: array![[4.0, 1.0, 0.0]],
+//                 max: array![[1.0, 1.0, 0.0]],
+//                 argmax: array![[0, 1, 0]],
+//                 cos: array![[0.5, 1.0, 0.0]],
+//                 celltype: array![[0, 1, -1]],
+//             }
+//         }
+//     }
 
-    // #[test]
-    // fn test_max_argmax() {
-    //     let setup = Setup::new();
+//     #[test]
+//     fn test_max_argmax() {
+//         let setup = Setup::new();
 
-    //     let max_argmax: (Array2<f64>, Array2<i8>) = get_max_argmax(&setup.cosine);
+//         let max_argmax: (Array2<f64>, Array2<i8>) = get_max_argmax(&setup.cosine);
 
-    //     assert_eq!(max_argmax.0, setup.max);
-    //     assert_eq!(max_argmax.1, setup.argmax);
-    // }
+//         assert_eq!(max_argmax.0, setup.max);
+//         assert_eq!(max_argmax.1, setup.argmax);
+//     }
 
-    // #[test]
-    // fn test_get_max_cosine_and_celltype() {
-    //     let setup = Setup::new();
+//     #[test]
+//     fn test_get_max_cosine_and_celltype() {
+//         let setup = Setup::new();
 
-    //     let cos_ct: ((Array2<f64>, Array2<f64>), Array2<i8>) =
-    //         get_max_cosine_and_celltype(setup.cosine, setup.norm);
+//         let cos_ct: ((Array2<f64>, Array2<f64>), Array2<i8>) =
+//             get_max_cosine_and_celltype(setup.cosine, setup.norm);
 
-    //     assert_eq!(cos_ct.0 .0, setup.cos);
-    //     assert_eq!(cos_ct.1, setup.celltype);
-    // }
-}
+//         assert_eq!(cos_ct.0 .0, setup.cos);
+//         assert_eq!(cos_ct.1, setup.celltype);
+//     }
+// }
