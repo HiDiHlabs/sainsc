@@ -1,4 +1,4 @@
-use crate::gridcounts::GridCounts;
+use crate::gridcounts::{GridCounts, GridFloats};
 use crate::sparsekde::sparse_kde_csx_;
 use crate::utils::create_pool;
 
@@ -14,13 +14,13 @@ use sprs::{CompressedStorage::CSR, CsMatI, CsMatViewI, SpIndex};
 use std::{cmp::min, error::Error, ops::Range};
 
 macro_rules! build_cos_ct_fn {
-    ($name:tt, $t_cos:ty, $t_ct:ty) => {
+    ($name:tt, $t_data:ty, $t_cos:ty, $t_ct:ty) => {
         #[pyfunction]
         #[pyo3(signature = (counts, genes, signatures, kernel, *, log=false, low_memory=true, chunk_size=(500, 500), n_threads=None))]
         /// calculate cosine similarity and assign celltype
         pub fn $name<'py>(
             py: Python<'py>,
-            counts: &mut GridCounts,
+            counts: &mut $t_data,
             genes: Vec<String>,
             signatures: PyReadonlyArray2<'py, $t_cos>,
             kernel: PyReadonlyArray2<'py, $t_cos>,
@@ -67,8 +67,10 @@ macro_rules! build_cos_ct_fn {
     };
 }
 
-build_cos_ct_fn!(cosinef32_and_celltypei8, f32, i8);
-build_cos_ct_fn!(cosinef32_and_celltypei16, f32, i16);
+build_cos_ct_fn!(gridcounts_cosinef32_celltypei8, GridCounts, f32, i8);
+build_cos_ct_fn!(gridcounts_cosinef32_celltypei16, GridCounts, f32, i16);
+build_cos_ct_fn!(gridfloats_cosinef32_celltypei8, GridFloats, f32, i8);
+build_cos_ct_fn!(gridfloats_cosinef32_celltypei16, GridFloats, f32, i16);
 
 fn chunk_and_calculate_cosine<C, I, F, U>(
     counts: &[CsMatViewI<C, I>],

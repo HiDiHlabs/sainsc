@@ -10,7 +10,6 @@ from scipy.sparse import csr_matrix, sparray, spmatrix
 from skimage.measure import label, regionprops
 
 from .._utils import _get_coordinate_index
-from .._utils_rust import GridCounts
 
 T = TypeVar("T", bound=np.number)
 U = TypeVar("U", bound=np.bool_ | np.integer)
@@ -68,7 +67,7 @@ def _localmax_anndata(
 class CosineCelltypeCallable(Protocol):
     def __call__(
         self,
-        counts: GridCounts,
+        counts,  # TODO: add typehints if possible
         genes: list[str],
         signatures: NDArray[np.float32],
         kernel: NDArray[np.float32],

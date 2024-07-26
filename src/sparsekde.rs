@@ -1,5 +1,5 @@
 use crate::{
-    gridcounts::{Count, CsxIndex, GridCounts},
+    gridcounts::{CsxIndex, GridCounts, GridFloats},
     sparsearray_conversion::WrappedCsx,
     utils::create_pool,
 };
@@ -34,40 +34,48 @@ macro_rules! build_kde_csx_fn {
     };
 }
 
-build_kde_csx_fn!(sparse_kde_csx_py, Count, CsxIndex);
+build_kde_csx_fn!(sparse_kde_csxu32, u32, CsxIndex);
+build_kde_csx_fn!(sparse_kde_csxf32, f32, CsxIndex);
 
-#[pyfunction]
-#[pyo3(signature = (counts, genes, kernel, coordinates, *, n_threads=None))]
-/// calculate KDE and retrieve coordinates
-pub fn kde_at_coord<'py>(
-    _py: Python<'py>,
-    counts: &GridCounts,
-    genes: Vec<String>,
-    kernel: PyReadonlyArray2<'py, KDEPrecision>,
-    coordinates: (PyReadonlyArray1<'py, isize>, PyReadonlyArray1<'py, isize>),
-    n_threads: Option<usize>,
-) -> PyResult<WrappedCsx<KDEPrecision, usize, usize>> {
-    let gene_counts: Vec<_> = genes
-        .iter()
-        .map(|g| {
-            counts
-                .get_view(g)
-                .ok_or(PyValueError::new_err("Not all genes exist"))
-        })
-        .collect::<Result<_, _>>()?;
+macro_rules! build_kde_at_coord_fn {
+    ($name:tt, $t:ty) => {
+        #[pyfunction]
+        #[pyo3(signature = (counts, genes, kernel, coordinates, *, n_threads=None))]
+        /// calculate KDE and retrieve coordinates
+        pub fn $name<'py>(
+            _py: Python<'py>,
+            counts: &$t,
+            genes: Vec<String>,
+            kernel: PyReadonlyArray2<'py, KDEPrecision>,
+            coordinates: (PyReadonlyArray1<'py, isize>, PyReadonlyArray1<'py, isize>),
+            n_threads: Option<usize>,
+        ) -> PyResult<WrappedCsx<KDEPrecision, usize, usize>> {
+            let gene_counts: Vec<_> = genes
+                .iter()
+                .map(|g| {
+                    counts
+                        .get_view(g)
+                        .ok_or(PyValueError::new_err("Not all genes exist"))
+                })
+                .collect::<Result<_, _>>()?;
 
-    let coordinates = (coordinates.0.as_array(), coordinates.1.as_array());
+            let coordinates = (coordinates.0.as_array(), coordinates.1.as_array());
 
-    match kde_at_coord_(
-        &gene_counts,
-        kernel.as_array(),
-        coordinates,
-        n_threads.unwrap_or(0),
-    ) {
-        Err(e) => Err(PyRuntimeError::new_err(e.to_string())),
-        Ok(kde_coord) => Ok(WrappedCsx(kde_coord)),
-    }
+            match kde_at_coord_(
+                &gene_counts,
+                kernel.as_array(),
+                coordinates,
+                n_threads.unwrap_or(0),
+            ) {
+                Err(e) => Err(PyRuntimeError::new_err(e.to_string())),
+                Ok(kde_coord) => Ok(WrappedCsx(kde_coord)),
+            }
+        }
+    };
 }
+
+build_kde_at_coord_fn!(gridcounts_kde_at_coord, GridCounts);
+build_kde_at_coord_fn!(gridfloats_kde_at_coord, GridFloats);
 
 #[inline]
 fn in_bounds_range<I: Signed + PrimInt>(n: I, i: I, pad: I) -> (I, I) {

@@ -38,8 +38,8 @@ autodoc_typehints_format = "short"
 autoapi_dirs = ["../../sainsc"]
 autoapi_options = [
     "members",
+    "inherited-members",
     "undoc-members",
-    "show-inheritance",
     "show-module-summary",
     "imported-members",
 ]

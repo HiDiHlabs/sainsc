@@ -19,14 +19,18 @@ from numpy.typing import NDArray
 from scipy.sparse import coo_array, csc_array, csr_array
 from skimage.feature import peak_local_max
 
-from .. import GridCounts
+from .. import GridCounts, GridFloats
 from .._typealias import _Cmap, _Csx, _CsxArray, _Local_Max, _RangeTuple2D
 from .._utils import _get_n_cpus, _raise_module_load_error
 from .._utils_rust import (
-    cosinef32_and_celltypei8,
-    cosinef32_and_celltypei16,
-    kde_at_coord,
-    sparse_kde_csx_py,
+    gridcounts_cosinef32_celltypei8,
+    gridcounts_cosinef32_celltypei16,
+    gridcounts_kde_at_coord,
+    gridfloats_cosinef32_celltypei8,
+    gridfloats_cosinef32_celltypei16,
+    gridfloats_kde_at_coord,
+    sparse_kde_csxf32,
+    sparse_kde_csxu32,
 )
 from ._kernel import gaussian_kernel
 from ._utils import (
@@ -54,14 +58,14 @@ class LazyKDE:
 
     def __init__(
         self,
-        counts: GridCounts,
+        counts: GridCounts | GridFloats,
         *,
         n_threads: int | None = None,
     ):
         """
         Parameters
         ----------
-        counts : sainsc.GridCounts
+        counts : sainsc.GridCounts | sainsc.GridFloats
             Gene counts.
         n_threads : int, optional
             Number of threads used for reading and processing file. If `None` this will
@@ -70,9 +74,9 @@ class LazyKDE:
         if n_threads is None:
             n_threads = _get_n_cpus()
 
-        self.counts: GridCounts = counts
+        self.counts: GridCounts | GridFloats = counts
         """
-        sainsc.GridCounts :  Spatial gene counts.
+        sainsc.GridCounts | sainsc.GridFloats :  Spatial gene counts.
         """
 
         self.counts.n_threads = n_threads
@@ -209,7 +213,10 @@ class LazyKDE:
             arr = csr_array(arr)
 
         if arr.dtype == np.uint32:
-            return sparse_kde_csx_py(arr, self.kernel, threshold=threshold)
+            return sparse_kde_csxu32(arr, self.kernel, threshold=threshold)
+        elif arr.dtype == np.float32:
+            return sparse_kde_csxf32(arr, self.kernel, threshold=threshold)
+
         else:
             raise TypeError("Sparse KDE currently only supports 'numpy.uint32'")
 
@@ -425,10 +432,23 @@ class LazyKDE:
         assert self.local_maxima is not None
         if self.kernel is None:
             raise ValueError("`kernel` must be set before running KDE")
-
-        return kde_at_coord(
-            self.counts, genes, self.kernel, self.local_maxima, n_threads=self.n_threads
-        )
+        match self.counts:
+            case GridCounts():
+                return gridcounts_kde_at_coord(
+                    self.counts,
+                    genes,
+                    self.kernel,
+                    self.local_maxima,
+                    n_threads=self.n_threads,
+                )
+            case GridFloats():
+                return gridfloats_kde_at_coord(
+                    self.counts,
+                    genes,
+                    self.kernel,
+                    self.local_maxima,
+                    n_threads=self.n_threads,
+                )
 
     ## Celltyping
     def filter_background(
@@ -534,14 +554,18 @@ class LazyKDE:
 
         self._background = background
 
-    @staticmethod
-    def _calculate_cosine_celltype_fn(dtype) -> CosineCelltypeCallable:
-        if dtype == np.int8:
-            return cosinef32_and_celltypei8
-        elif dtype == np.int16:
-            return cosinef32_and_celltypei16
-        else:
-            raise NotImplementedError
+    def _calculate_cosine_celltype_fn(self, dtype) -> CosineCelltypeCallable:
+        match (self.counts, dtype):
+            case (GridCounts(), np.int8):
+                return gridcounts_cosinef32_celltypei8
+            case (GridCounts(), np.int16):
+                return gridcounts_cosinef32_celltypei16
+            case (GridFloats(), np.int8):
+                return gridfloats_cosinef32_celltypei8
+            case (GridFloats(), np.int16):
+                return gridfloats_cosinef32_celltypei16
+            case _:
+                raise NotImplementedError
 
     def assign_celltype(
         self,

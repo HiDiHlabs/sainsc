@@ -1,18 +1,40 @@
+from abc import ABC
+from typing import Any
+
 import numpy as np
 from numpy.typing import NDArray
 from polars import DataFrame
 
 from ._typealias import _Csx, _CsxArray
 
-def sparse_kde_csx_py(
+def sparse_kde_csxf32(
     counts: _Csx, kernel: NDArray[np.float32], *, threshold: float = 0
 ) -> _CsxArray:
     """
-    Calculate the KDE for each spot with counts as uint16.
+    Calculate the KDE for each spot with values as float32.
     """
 
-def kde_at_coord(
+def sparse_kde_csxu32(
+    counts: _Csx, kernel: NDArray[np.float32], *, threshold: float = 0
+) -> _CsxArray:
+    """
+    Calculate the KDE for each spot with counts as uint32.
+    """
+
+def gridcounts_kde_at_coord(
     counts: GridCounts,
+    genes: list[str],
+    kernel: NDArray[np.float32],
+    coordinates: tuple[NDArray[np.int_], NDArray[np.int_]],
+    *,
+    n_threads: int | None = None,
+) -> _CsxArray:
+    """
+    Calculate KDE at the given coordinates.
+    """
+
+def gridfloats_kde_at_coord(
+    counts: GridFloats,
     genes: list[str],
     kernel: NDArray[np.float32],
     coordinates: tuple[NDArray[np.int_], NDArray[np.int_]],
@@ -37,7 +59,7 @@ def coordinate_as_string(
     Concatenate two int arrays elementwise into a string representation (i.e. 'x_y').
     """
 
-def cosinef32_and_celltypei8(
+def gridcounts_cosinef32_celltypei8(
     counts: GridCounts,
     genes: list[str],
     signatures: NDArray[np.float32],
@@ -53,7 +75,7 @@ def cosinef32_and_celltypei8(
     similar celltype.
     """
 
-def cosinef32_and_celltypei16(
+def gridcounts_cosinef32_celltypei16(
     counts: GridCounts,
     genes: list[str],
     signatures: NDArray[np.float32],
@@ -69,9 +91,41 @@ def cosinef32_and_celltypei16(
     similar celltype.
     """
 
-class GridCounts:
+def gridfloats_cosinef32_celltypei8(
+    counts: GridFloats,
+    genes: list[str],
+    signatures: NDArray[np.float32],
+    kernel: NDArray[np.float32],
+    *,
+    log: bool = False,
+    low_memory: bool = True,
+    chunk_size: tuple[int, int] = (500, 500),
+    n_threads: int | None = None,
+) -> tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.int8]]:
     """
-    Object holding each gene as count data in a sparse 2D-grid.
+    Calculate the cosine similarity given counts and signatures and assign the most
+    similar celltype.
+    """
+
+def gridfloats_cosinef32_celltypei16(
+    counts: GridFloats,
+    genes: list[str],
+    signatures: NDArray[np.float32],
+    kernel: NDArray[np.float32],
+    *,
+    log: bool = False,
+    low_memory: bool = True,
+    chunk_size: tuple[int, int] = (500, 500),
+    n_threads: int | None = None,
+) -> tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.int16]]:
+    """
+    Calculate the cosine similarity given counts and signatures and assign the most
+    similar celltype.
+    """
+
+class GridFeatures(ABC):
+    """
+    Abstract Base class to avoid duplication of documentation
     """
 
     shape: tuple[int, int]
@@ -115,9 +169,9 @@ class GridCounts:
         """
         Initialize from dataframe.
 
-        Transform a :py:class:`polars.DataFrame` that provides a 'gene', 'x', and 'y'
-        column into :py:class:`sainsc.GridCounts`. If a 'count' column exists it will
-        be used as counts else a count of 1 (single molecule) per row will be assumed.
+        Generate an instance of this class by transforming a :py:class:`polars.DataFrame`
+        that provides a 'gene', 'x', and 'y' column. If a 'count' column exists it is
+        used as counts else a count of 1 (single molecule) per row is assumed.
 
         Parameters
         ----------
@@ -131,10 +185,6 @@ class GridCounts:
         n_threads : int, optional
             Number of threads used for initializing :py:class:`sainsc.LazyKDE`.
             If `None` this will default to the number of logical CPUs.
-
-        Returns
-        -------
-        sainsc.GridCounts
         """
 
     def __getitem__(self, key: str) -> _CsxArray: ...
@@ -167,17 +217,17 @@ class GridCounts:
         list[str]
         """
 
-    def gene_counts(self) -> dict[str, int]:
+    def gene_counts(self) -> dict[str, Any]:
         """
         Number of counts per gene.
 
         Returns
         -------
-        dict[str, int]
+        dict[str, typing.Any]
             Mapping from gene to number of counts.
         """
 
-    def grid_counts(self) -> NDArray[np.uintc]:
+    def grid_counts(self) -> NDArray:
         """
         Counts per pixel.
 
@@ -185,7 +235,7 @@ class GridCounts:
 
         Returns
         -------
-        numpy.ndarray[numpy.uintc]
+        numpy.ndarray
         """
 
     def select_genes(self, genes: set[str]):
@@ -198,18 +248,7 @@ class GridCounts:
             List of gene names to keep.
         """
 
-    def filter_genes_by_count(self, min: int = 1, max: int = 4_294_967_295):
-        """
-        Filter genes by minimum and maximum count thresholds.
-
-        Parameters
-        ----------
-        min : int, optional
-            Minimum count threshold.
-        max : int, optional
-            Maximum count threshold.
-        """
-
+    def filter_genes_by_count(self, min, max): ...
     def crop(self, x: tuple[int | None, int | None], y: tuple[int | None, int | None]):
         """
         Crop the field of view for all genes.
@@ -258,3 +297,81 @@ class GridCounts:
 
     @n_threads.setter
     def n_threads(self, n_threads: int): ...
+
+class GridCounts(GridFeatures):
+    """
+    Object holding each gene as count data in a sparse 2D-grid.
+    """
+
+    def filter_genes_by_count(self, min: int = 0, max: int = np.iinfo(np.uint32).max):
+        """
+        Filter genes by minimum and maximum count thresholds.
+
+        Parameters
+        ----------
+        min : int, optional
+            Minimum count threshold.
+        max : int, optional
+            Maximum count threshold.
+        """
+
+    def gene_counts(self) -> dict[str, int]:
+        """
+        Number of counts per gene.
+
+        Returns
+        -------
+        dict[str, int]
+            Mapping from gene to number of counts.
+        """
+
+    def grid_counts(self) -> NDArray[np.uintc]:
+        """
+        Counts per pixel.
+
+        Aggregates counts across all genes.
+
+        Returns
+        -------
+        numpy.ndarray[numpy.uintc]
+        """
+
+class GridFloats(GridFeatures):
+    """
+    Object holding each gene in a sparse 2D-grid.
+    """
+
+    def filter_genes_by_count(
+        self, min: float = 0, max: float = float(np.finfo(np.float32).max)
+    ):
+        """
+        Filter genes by minimum and maximum count thresholds.
+
+        Parameters
+        ----------
+        min : float, optional
+            Minimum count threshold.
+        max : float, optional
+            Maximum count threshold.
+        """
+
+    def gene_counts(self) -> dict[str, float]:
+        """
+        Number of counts per gene.
+
+        Returns
+        -------
+        dict[str, float]
+            Mapping from gene to number of counts.
+        """
+
+    def grid_counts(self) -> NDArray[np.float32]:
+        """
+        Counts per pixel.
+
+        Aggregates counts across all genes.
+
+        Returns
+        -------
+        numpy.ndarray[numpy.single]
+        """
