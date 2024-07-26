@@ -111,15 +111,15 @@ class LazyKDE:
             Other keyword arguments are passed to
             :py:meth:`sainsc.GridCounts.from_dataframe`.
         """
-        if isinstance(df, pd.DataFrame):
-            df = pl.from_pandas(df)
 
-        # TODO ensure dataframe format
         count_col = ["count"] if "count" in df.columns else []
+        columns = ["gene", "x", "y"] + count_col
 
-        df = df.select(
-            pl.col("gene").cast(pl.Categorical), pl.col(["x", "y"] + count_col)
-        )
+        if isinstance(df, pd.DataFrame):
+            df = pl.from_pandas(df[columns])
+        else:
+            df = df.select(pl.col(columns))
+
         return cls(
             GridCounts.from_dataframe(df, n_threads=n_threads, **kwargs),
             n_threads=n_threads,
