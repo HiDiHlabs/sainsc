@@ -957,7 +957,7 @@ class LazyKDE:
 
         Returns
         -------
-        matplotlib.figure.Figure | numpy.ndarray[numpy.uint8]
+        matplotlib.figure.Figure | numpy.ndarray[numpy.ubyte]
 
 
         See Also
