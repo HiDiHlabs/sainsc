@@ -5,9 +5,8 @@ from typing import Literal
 import numpy as np
 from numpy.typing import NDArray
 
-from sainsc._utils_rust import categorical_coordinate
-
 from .._typealias import _PathLike
+from .._utils_rust import categorical_coordinate
 
 
 def _categorical_coordinate(

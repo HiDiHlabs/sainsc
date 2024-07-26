@@ -9,9 +9,8 @@ from numpy.typing import NDArray
 from scipy.sparse import csr_matrix, sparray, spmatrix
 from skimage.measure import label, regionprops
 
-from sainsc._utils_rust import GridCounts
-
 from .._utils import _get_coordinate_index
+from .._utils_rust import GridCounts
 
 T = TypeVar("T", bound=np.number)
 U = TypeVar("U", bound=np.bool_ | np.integer)
