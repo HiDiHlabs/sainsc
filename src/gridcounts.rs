@@ -31,6 +31,7 @@ use sprs::{
 use std::{
     cmp::min,
     collections::{HashMap, HashSet},
+    error::Error,
     ops::AddAssign,
 };
 
@@ -42,7 +43,7 @@ macro_rules! build_GridClass {
     ($name:tt, $t:ty, $t_pl:ty) => {
         #[pyclass(mapping, module = "sainsc")]
         pub struct $name {
-            counts: HashMap<String, CsMatI<$t, CsxIndex>>,
+            pub counts: HashMap<String, CsMatI<$t, CsxIndex>>,
             #[pyo3(get)]
             pub shape: (usize, usize),
             #[pyo3(get)]
@@ -53,6 +54,34 @@ macro_rules! build_GridClass {
         }
 
         impl $name {
+            pub fn new(
+                counts: HashMap<String, CsMatI<$t, CsxIndex>>,
+                resolution: Option<f32>,
+                n_threads: Option<usize>,
+            ) -> Result<Self, Box<dyn Error>> {
+                let n_threads = n_threads.unwrap_or(0);
+                let threadpool = create_pool(n_threads)?;
+
+                let shape = if counts.is_empty() {
+                    (0, 0)
+                } else {
+                    let shapes: Vec<_> = counts.values().map(|v| v.shape()).collect();
+
+                    if !shapes.windows(2).all(|w| w[0] == w[1]) {
+                        return Err("All sparse arrays must have same shape".into());
+                    }
+
+                    *shapes.first().expect("Length is non-zero")
+                };
+
+                Ok(Self {
+                    counts,
+                    shape,
+                    resolution,
+                    n_threads,
+                    threadpool,
+                })
+            }
             pub fn get_view(&self, gene: &String) -> Option<CsMatViewI<$t, CsxIndex>> {
                 self.counts.get(gene).map(|x| x.view())
             }
@@ -72,39 +101,17 @@ macro_rules! build_GridClass {
         impl $name {
             #[new]
             #[pyo3(signature = (counts, *, resolution=None, n_threads=None))]
-            fn new(
+            fn new_py(
                 counts: HashMap<String, WrappedCsx<$t, CsxIndex, CsxIndex>>,
                 resolution: Option<f32>,
                 n_threads: Option<usize>,
             ) -> PyResult<Self> {
-                let n_threads = n_threads.unwrap_or(0);
-                let threadpool =
-                    create_pool(n_threads).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-
-                let counts: HashMap<_, _> =
-                    threadpool.install(|| counts.into_par_iter().map(|(k, v)| (k, v.0)).collect());
-
-                let shape = if counts.is_empty() {
-                    (0, 0)
-                } else {
-                    let shapes: Vec<_> = counts.values().map(|v| v.shape()).collect();
-
-                    if !shapes.windows(2).all(|w| w[0] == w[1]) {
-                        return Err(PyValueError::new_err(
-                            "All sparse arrays must have same shape",
-                        ));
-                    }
-
-                    *shapes.first().expect("Length is non-zero")
-                };
-
-                Ok(Self {
-                    counts,
-                    shape,
+                Self::new(
+                    counts.into_iter().map(|(k, v)| (k, v.0)).collect(),
                     resolution,
                     n_threads,
-                    threadpool,
-                })
+                )
+                .map_err(|e| PyRuntimeError::new_err(e.to_string()))
             }
 
             #[classmethod]

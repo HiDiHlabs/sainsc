@@ -123,6 +123,17 @@ def gridfloats_cosinef32_celltypei16(
     similar celltype.
     """
 
+def correct_ambient_rna_rs(
+    counts: GridCounts,
+    scale: GridFloats,
+    bin_ratio: int,
+    *,
+    n_threads: int | None = None,
+) -> GridFloats:
+    """
+    Calculate the corrected RNA counts based on scaling factor from binned data.
+    """
+
 class GridFeatures(ABC):
     """
     Abstract Base class to avoid duplication of documentation

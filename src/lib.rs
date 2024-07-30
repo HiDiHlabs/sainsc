@@ -1,3 +1,4 @@
+mod ambient_correction;
 mod coordinates;
 mod cosine;
 mod gridcounts;
@@ -5,13 +6,13 @@ mod sparsearray_conversion;
 mod sparsekde;
 mod utils;
 
+use ambient_correction::correct_ambient_rna_rs;
 use coordinates::{categorical_coordinate, coordinate_as_string};
 use cosine::{
     gridcounts_cosinef32_celltypei16, gridcounts_cosinef32_celltypei8,
     gridfloats_cosinef32_celltypei16, gridfloats_cosinef32_celltypei8,
 };
-use gridcounts::GridCounts;
-use gridcounts::GridFloats;
+use gridcounts::{GridCounts, GridFloats};
 use pyo3::prelude::*;
 use sparsekde::{
     gridcounts_kde_at_coord, gridfloats_kde_at_coord, sparse_kde_csxf32, sparse_kde_csxu32,
@@ -33,5 +34,6 @@ fn _utils_rust(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(gridfloats_cosinef32_celltypei8, m)?)?;
     m.add_function(wrap_pyfunction!(coordinate_as_string, m)?)?;
     m.add_function(wrap_pyfunction!(categorical_coordinate, m)?)?;
+    m.add_function(wrap_pyfunction!(correct_ambient_rna_rs, m)?)?;
     Ok(())
 }
