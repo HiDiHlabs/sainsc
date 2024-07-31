@@ -301,6 +301,7 @@ where
                 cosine
                     .outer_iter_mut()
                     .zip(&weights)
+                    .filter(|(_, &w)| w != zero::<F>())
                     .for_each(|(mut cos, &w)| cos += &kde_unpadded.map(|&x| x * w));
             }
             // TODO: write to zarr
