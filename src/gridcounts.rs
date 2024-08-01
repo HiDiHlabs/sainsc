@@ -6,7 +6,10 @@ use ndarray::Array2;
 use num::Zero;
 use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
 use polars::{
-    datatypes::DataType::{Int32, UInt32},
+    datatypes::{
+        CategoricalOrdering::Physical,
+        DataType::{Categorical, Int32, UInt32},
+    },
     prelude::*,
 };
 use pyo3::{
@@ -154,9 +157,12 @@ impl GridCounts {
                 Ok(s) => df.with_column(s.strict_cast(&UInt32)?)?,
             };
 
-            // if df.column("gene")?.unpack()?.dtype() != Categorical {
-            //     df.with_column(df.column("gene")?.cast(&Categorical)?);
-            // }
+            if !df.column("gene")?.dtype().is_categorical() {
+                df.with_column(
+                    df.column("gene")?
+                        .strict_cast(&Categorical(None, Physical))?,
+                )?;
+            }
 
             let shape = (
                 df.column("x")?.max::<usize>()?.expect("non-null") + 1,
@@ -175,11 +181,6 @@ impl GridCounts {
                         .expect("df must be non-empty")
                         .expect("`gene` must not be null")
                         .to_owned();
-
-                    // let gene = match df.column("gene")?.unpack()?.get(0) {
-                    //     s: String => s.clone(),
-                    //     CategoricalType(s) => s.clone(),
-                    // };
 
                     let x = col_as_nonull_vec(&df, "x", |s| s.i32())?;
                     let y = col_as_nonull_vec(&df, "y", |s| s.i32())?;
@@ -249,7 +250,7 @@ impl GridCounts {
         !self.__eq__(other)
     }
 
-    fn __setstate__<'py>(&mut self, state: Bound<'py, PyBytes>) -> PyResult<()> {
+    fn __setstate__(&mut self, state: Bound<'_, PyBytes>) -> PyResult<()> {
         let (counts, shape, resolution, n_threads) = deserialize(state.as_bytes()).unwrap();
         self.counts = counts;
         self.shape = shape;
@@ -275,12 +276,12 @@ impl GridCounts {
     }
 
     fn __str__(&self) -> String {
-        let repr = vec![
+        let repr = [
             format!("GridCounts ({} threads)", self.n_threads),
             format!("genes: {}", self.counts.len()),
             format!("shape: {:?}", self.shape),
         ];
-        return repr.join("\n    ");
+        repr.join("\n    ")
     }
 
     fn get(

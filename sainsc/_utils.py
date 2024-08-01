@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from sainsc._utils_rust import coordinate_as_string
+from ._utils_rust import coordinate_as_string
 
 
 def _get_n_cpus() -> int:

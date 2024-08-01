@@ -19,16 +19,15 @@ from numpy.typing import NDArray
 from scipy.sparse import coo_array, csc_array, csr_array
 from skimage.feature import peak_local_max
 
-from sainsc._utils_rust import (
-    GridCounts,
+from .. import GridCounts
+from .._typealias import _Cmap, _Csx, _CsxArray, _Local_Max, _RangeTuple2D
+from .._utils import _get_n_cpus, _raise_module_load_error
+from .._utils_rust import (
     cosinef32_and_celltypei8,
     cosinef32_and_celltypei16,
     kde_at_coord,
     sparse_kde_csx_py,
 )
-
-from .._typealias import _Cmap, _Csx, _CsxArray, _Local_Max, _RangeTuple2D
-from .._utils import _get_n_cpus, _raise_module_load_error
 from ._kernel import gaussian_kernel
 from ._utils import (
     _SCALEBAR,
@@ -111,15 +110,15 @@ class LazyKDE:
             Other keyword arguments are passed to
             :py:meth:`sainsc.GridCounts.from_dataframe`.
         """
-        if isinstance(df, pd.DataFrame):
-            df = pl.from_pandas(df)
 
-        # TODO ensure dataframe format
         count_col = ["count"] if "count" in df.columns else []
+        columns = ["gene", "x", "y"] + count_col
 
-        df = df.select(
-            pl.col("gene").cast(pl.Categorical), pl.col(["x", "y"] + count_col)
-        )
+        if isinstance(df, pd.DataFrame):
+            df = pl.from_pandas(df[columns])
+        else:
+            df = df.select(pl.col(columns))
+
         return cls(
             GridCounts.from_dataframe(df, n_threads=n_threads, **kwargs),
             n_threads=n_threads,
@@ -198,16 +197,16 @@ class LazyKDE:
         return self._kde(self.counts[gene], threshold)
 
     def _kde(self, arr: NDArray | _Csx, threshold: float | None = None) -> _CsxArray:
-        # TODO use ndimage.gaussian_filter for "dense" arrays?
-        # ndimage.gaussian_filter(arr, sigma, mode="constant", cval=0, truncate=2)
+        if self.kernel is None:
+            raise ValueError("`kernel` must be set before running KDE")
+
         if threshold is None:
             threshold = 0
 
         if isinstance(arr, np.ndarray):
+            # scipy.ndimage.convolve could be used for dense arrays but seems to be
+            # slower than converting to sparse and running custom kde
             arr = csr_array(arr)
-
-        if self.kernel is None:
-            raise ValueError("`kernel` must be set before running KDE")
 
         if arr.dtype == np.uint32:
             return sparse_kde_csx_py(arr, self.kernel, threshold=threshold)
@@ -244,9 +243,8 @@ class LazyKDE:
         """
         if self.total_mRNA is None or self.total_mRNA.shape != self.shape:
             self.calculate_total_mRNA()
-        total_mRNA_counts = self.total_mRNA
-        assert total_mRNA_counts is not None
-        self._total_mRNA_KDE = self._kde(total_mRNA_counts).toarray()
+        assert self.total_mRNA is not None
+        self._total_mRNA_KDE = self._kde(self.total_mRNA).toarray()
 
     ## Local maxima / cell proxies
     def find_local_maxima(self, min_dist: int, min_area: int = 0):
@@ -953,7 +951,7 @@ class LazyKDE:
 
         Returns
         -------
-        matplotlib.figure.Figure | numpy.ndarray[numpy.uint8]
+        matplotlib.figure.Figure | numpy.ndarray[numpy.ubyte]
 
 
         See Also
