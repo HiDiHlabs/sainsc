@@ -250,7 +250,7 @@ impl GridCounts {
         !self.__eq__(other)
     }
 
-    fn __setstate__<'py>(&mut self, state: Bound<'py, PyBytes>) -> PyResult<()> {
+    fn __setstate__(&mut self, state: Bound<'_, PyBytes>) -> PyResult<()> {
         let (counts, shape, resolution, n_threads) = deserialize(state.as_bytes()).unwrap();
         self.counts = counts;
         self.shape = shape;
@@ -276,12 +276,12 @@ impl GridCounts {
     }
 
     fn __str__(&self) -> String {
-        let repr = vec![
+        let repr = [
             format!("GridCounts ({} threads)", self.n_threads),
             format!("genes: {}", self.counts.len()),
             format!("shape: {:?}", self.shape),
         ];
-        return repr.join("\n    ");
+        repr.join("\n    ")
     }
 
     fn get(
