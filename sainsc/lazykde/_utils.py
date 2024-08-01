@@ -74,7 +74,6 @@ class CosineCelltypeCallable(Protocol):
         kernel: NDArray[np.float32],
         *,
         log: bool = ...,
-        low_memory: bool = ...,
         chunk_size: tuple[int, int] = ...,
         n_threads: int | None = ...,
     ) -> tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.signedinteger]]: ...

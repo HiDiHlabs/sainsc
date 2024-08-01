@@ -2,6 +2,7 @@ use crate::gridcounts::GridCounts;
 use crate::sparsekde::sparse_kde_csx_;
 use crate::utils::create_pool;
 
+use itertools::Itertools;
 use ndarray::{
     concatenate, s, Array2, Array3, ArrayView1, ArrayView2, Axis, NdFloat, NewAxis, ShapeError,
     Slice, Zip,
@@ -16,7 +17,7 @@ use std::{cmp::min, error::Error, ops::Range};
 macro_rules! build_cos_ct_fn {
     ($name:tt, $t_cos:ty, $t_ct:ty) => {
         #[pyfunction]
-        #[pyo3(signature = (counts, genes, signatures, kernel, *, log=false, low_memory=true, chunk_size=(500, 500), n_threads=None))]
+        #[pyo3(signature = (counts, genes, signatures, kernel, *, log=false, chunk_size=(500, 500), n_threads=None))]
         /// calculate cosine similarity and assign celltype
         pub fn $name<'py>(
             py: Python<'py>,
@@ -25,7 +26,6 @@ macro_rules! build_cos_ct_fn {
             signatures: PyReadonlyArray2<'py, $t_cos>,
             kernel: PyReadonlyArray2<'py, $t_cos>,
             log: bool,
-            low_memory: bool,
             chunk_size: (usize, usize),
             n_threads: Option<usize>,
         ) -> PyResult<(
@@ -50,7 +50,6 @@ macro_rules! build_cos_ct_fn {
                 kernel.as_array(),
                 counts.shape,
                 log,
-                low_memory,
                 chunk_size,
                 n_threads.unwrap_or(0),
             );
@@ -76,7 +75,6 @@ fn chunk_and_calculate_cosine<C, I, F, U>(
     kernel: ArrayView2<F>,
     shape: (usize, usize),
     log: bool,
-    low_memory: bool,
     chunk_size: (usize, usize),
     n_threads: usize,
 ) -> Result<(Array2<F>, Array2<F>, Array2<U>), Box<dyn Error>>
@@ -93,7 +91,7 @@ where
 
     let (nrow, ncol) = shape;
     let (srow, scol) = chunk_size;
-    let (padrow, padcol) = ((kernelsize[0] - 1) / 2, (kernelsize[1] - 1) / 2);
+    let pad = ((kernelsize[0] - 1) / 2, (kernelsize[1] - 1) / 2);
     let (m, n) = (nrow.div_ceil(srow), ncol.div_ceil(scol)); // number of chunks
 
     let n_celltype = signatures.ncols();
@@ -117,97 +115,57 @@ where
             }
         });
 
-    let (cosine, score, celltype) = pool.install(|| {
-        if low_memory {
-            let mut cosine = Vec::with_capacity(m * n);
-            let mut score = Vec::with_capacity(m * n);
-            let mut celltype = Vec::with_capacity(m * n);
+    let ((cosine, score), celltype): ((Vec<_>, Vec<_>), Vec<_>) = pool.install(|| {
+        // generate all chunk indices
+        let chunk_indices: Vec<_> = (0..m).cartesian_product(0..n).collect();
 
-            for i in 0..m {
-                let (slice_row, unpad_row) = chunk_ranges(i, srow, nrow, padrow);
-                let row_chunk: Vec<_> = counts
-                    .par_iter()
-                    .map(|c| {
-                        c.slice_outer(slice_row.clone())
-                            .transpose_view()
-                            .to_other_storage()
-                    })
-                    .collect();
+        // chunk and calculate cosine/celltype in parallel
+        chunk_indices
+            .into_par_iter()
+            .map(|idx| {
+                let (chunk, unpad) = get_chunk(counts, idx, shape, chunk_size, pad);
 
-                let ((cosine_cols, score_cols), celltype_cols): (
-                    (Vec<Array2<F>>, Vec<Array2<F>>),
-                    Vec<Array2<U>>,
-                ) = (0..n)
-                    .into_par_iter()
-                    .map(|j| {
-                        let (slice_col, unpad_col) = chunk_ranges(j, scol, ncol, padcol);
-
-                        let chunk = row_chunk
-                            .par_iter()
-                            .map(|c| c.slice_outer(slice_col.clone()).transpose_into().to_owned())
-                            .collect();
-
-                        cosine_and_celltype_(
-                            chunk,
-                            signatures,
-                            &signature_similarity_correction,
-                            kernel,
-                            (unpad_row.clone(), unpad_col),
-                            log,
-                        )
-                    })
-                    .unzip();
-                cosine.extend(cosine_cols);
-                score.extend(score_cols);
-                celltype.extend(celltype_cols);
-            }
-            (cosine, score, celltype)
-        } else {
-            let mut chunk_info = Vec::with_capacity(m * n);
-            for i in 0..m {
-                let (slice_row, unpad_row) = chunk_ranges(i, srow, nrow, padrow);
-                let row_chunk: Vec<_> = counts
-                    .par_iter()
-                    .map(|c| {
-                        c.slice_outer(slice_row.clone())
-                            .transpose_view()
-                            .to_other_storage()
-                    })
-                    .collect();
-                for j in 0..n {
-                    let (slice_col, unpad_col) = chunk_ranges(j, scol, ncol, padcol);
-                    let chunk: Vec<_> = row_chunk
-                        .par_iter()
-                        .map(|c| c.slice_outer(slice_col.clone()).transpose_into().to_owned())
-                        .collect();
-                    chunk_info.push(((unpad_row.clone(), unpad_col), chunk));
-                }
-            }
-
-            let ((cosine, score), celltype): ((Vec<Array2<F>>, Vec<Array2<F>>), Vec<Array2<U>>) =
-                chunk_info
-                    .into_par_iter()
-                    .map(|(unpad, chunk)| {
-                        cosine_and_celltype_(
-                            chunk,
-                            signatures,
-                            &signature_similarity_correction,
-                            kernel,
-                            unpad,
-                            log,
-                        )
-                    })
-                    .unzip();
-            (cosine, score, celltype)
-        }
+                cosine_and_celltype_(
+                    chunk,
+                    signatures,
+                    &signature_similarity_correction,
+                    kernel,
+                    unpad,
+                    log,
+                )
+            })
+            .unzip()
     });
 
     // concatenate all chunks back to original shape
-    let cosine = concat_2d(&cosine, n)?;
-    let score = concat_2d(&score, n)?;
-    let celltype = concat_2d(&celltype, n)?;
+    Ok((
+        concat_2d(&cosine, n)?,
+        concat_2d(&score, n)?,
+        concat_2d(&celltype, n)?,
+    ))
+}
 
-    Ok((cosine, score, celltype))
+fn get_chunk<C: Clone + Default, I: SpIndex>(
+    counts: &[CsMatViewI<C, I>],
+    idx: (usize, usize),
+    shape: (usize, usize),
+    size: (usize, usize),
+    pad: (usize, usize),
+) -> (Vec<CsMatI<C, I>>, (Range<usize>, Range<usize>)) {
+    let (slice_row, unpad_row) = chunk_ranges(idx.0, size.0, shape.0, pad.0);
+    let (slice_col, unpad_col) = chunk_ranges(idx.1, size.1, shape.1, pad.1);
+    let chunk = counts
+        .iter()
+        .map(|c| {
+            c.slice_outer(slice_row.clone())
+                .transpose_view()
+                .to_other_storage()
+                .slice_outer(slice_col.clone())
+                .transpose_into()
+                .to_owned()
+        })
+        .collect();
+    (chunk, (unpad_row, unpad_col))
 }
 
 fn concat_1d<T: Clone + Sync + Send>(
