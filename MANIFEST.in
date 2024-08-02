@@ -6,3 +6,6 @@ prune docs
 # exclude unnecessary configs
 exclude .pre-commit-config.yaml .readthedocs.yaml .yamlfmt.yaml
 prune .github
+
+# exclude example data
+prune data

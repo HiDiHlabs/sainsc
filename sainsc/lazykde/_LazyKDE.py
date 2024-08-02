@@ -19,10 +19,10 @@ from numpy.typing import NDArray
 from scipy.sparse import coo_array, csc_array, csr_array
 from skimage.feature import peak_local_max
 
-from .. import GridCounts
 from .._typealias import _Cmap, _Csx, _CsxArray, _Local_Max, _RangeTuple2D
 from .._utils import _get_n_cpus, _raise_module_load_error
 from .._utils_rust import (
+    GridCounts,
     cosinef32_and_celltypei8,
     cosinef32_and_celltypei16,
     kde_at_coord,

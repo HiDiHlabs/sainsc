@@ -48,7 +48,8 @@ docs = [
     "sphinx-rtd-theme",
     "myst-nb",
 ]
-dev = ["sainsc[docs,spatialdata]", "pre-commit"]
+data = ["pooch>=1"]
+dev = ["sainsc[data,docs,spatialdata]", "pre-commit"]
 
 [project.urls]
 homepage      = "https://github.com/HiDiHlabs/sainsc"
