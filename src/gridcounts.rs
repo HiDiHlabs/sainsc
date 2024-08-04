@@ -18,7 +18,7 @@ use pyo3::{
     prelude::*,
     types::{PyBytes, PyType},
 };
-use pyo3_polars::PyDataFrame;
+use pyo3_polars::{error::PyPolarsErr, PyDataFrame};
 use rayon::{
     iter::{
         IntoParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator,
@@ -205,7 +205,7 @@ impl GridCounts {
         let resolution = resolution.map(|r| r * binsize.unwrap_or(1.));
 
         match threadpool.install(|| _from_dataframe(df.into(), binsize)) {
-            Err(e) => Err(PyValueError::new_err(e.to_string())),
+            Err(e) => Err(PyPolarsErr::from(e).into()),
             Ok((counts, shape)) => Ok(Self {
                 counts,
                 shape,
@@ -456,14 +456,13 @@ impl GridCounts {
                     UInt32Array::from_vec(gene_idx),
                     Box::new(Utf8Array::<i32>::from_iter(genes.into_iter().map(Some))),
                 )
-                .map_err(|e| PyValueError::new_err(e.to_string()))?,
+                .map_err(PyPolarsErr::from)?,
             ),
         )
-        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        .map_err(PyPolarsErr::from)?;
 
-        match DataFrame::new(vec![genes, x, y, counts]) {
-            Ok(df) => Ok(PyDataFrame(df)),
-            Err(e) => Err(PyValueError::new_err(e.to_string())),
-        }
+        let df = DataFrame::new(vec![genes, x, y, counts]).map_err(PyPolarsErr::from)?;
+
+        Ok(PyDataFrame(df))
     }
 }
