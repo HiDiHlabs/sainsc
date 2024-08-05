@@ -135,6 +135,15 @@ class GridCounts:
         sainsc.GridCounts
         """
 
+    def as_dataframe(self) -> DataFrame:
+        """
+        Convert to a dataframe with 'gene', 'x', 'y', and 'count' column.
+
+        Returns
+        -------
+        polars.DataFrame
+        """
+
     def __getitem__(self, key: str) -> _CsxArray: ...
     def __setitem__(self, key: str, value: _Csx): ...
     def __delitem__(self, key: str): ...

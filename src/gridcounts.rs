@@ -1,7 +1,7 @@
 use crate::sparsearray_conversion::WrappedCsx;
 use crate::utils::create_pool;
 use bincode::{deserialize, serialize};
-use itertools::MultiUnzip;
+use itertools::Itertools;
 use ndarray::Array2;
 use num::Zero;
 use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
@@ -12,12 +12,13 @@ use polars::{
     },
     prelude::*,
 };
+use polars_arrow::array::{DictionaryArray, UInt32Array, Utf8Array};
 use pyo3::{
     exceptions::{PyKeyError, PyRuntimeError, PyValueError},
     prelude::*,
     types::{PyBytes, PyType},
 };
-use pyo3_polars::PyDataFrame;
+use pyo3_polars::{error::PyPolarsErr, PyDataFrame};
 use rayon::{
     iter::{
         IntoParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator,
@@ -31,6 +32,7 @@ use sprs::{
 use std::{
     cmp::min,
     collections::{HashMap, HashSet},
+    iter::repeat,
     ops::AddAssign,
 };
 
@@ -203,7 +205,7 @@ impl GridCounts {
         let resolution = resolution.map(|r| r * binsize.unwrap_or(1.));
 
         match threadpool.install(|| _from_dataframe(df.into(), binsize)) {
-            Err(e) => Err(PyValueError::new_err(e.to_string())),
+            Err(e) => Err(PyPolarsErr::from(e).into()),
             Ok((counts, shape)) => Ok(Self {
                 counts,
                 shape,
@@ -425,5 +427,42 @@ impl GridCounts {
                 *mat = TriMatI::from_triplets(self.shape, x, y, data).to_csr();
             });
         });
+    }
+
+    fn as_dataframe(&mut self) -> PyResult<PyDataFrame> {
+        self.to_format(CSR);
+
+        let genes: Vec<_> = self.counts.keys().sorted().collect();
+
+        let ((counts, (x, y)), gene_idx): ((Vec<&Count>, (Vec<_>, Vec<_>)), Vec<_>) = genes
+            .iter()
+            .zip(0u32..)
+            .flat_map(|(&gene, i)| {
+                self.get_view(gene)
+                    .expect("gene exists because we collected the keys above")
+                    .iter_rbr()
+                    .zip(repeat(i))
+            })
+            .multiunzip();
+
+        let counts = Series::from_iter(counts).with_name("count");
+        let x = Series::from_vec("x", x);
+        let y = Series::from_vec("y", y);
+        // construct categorical gene array from codes and categories
+        let genes = Series::from_arrow(
+            "gene",
+            Box::new(
+                DictionaryArray::try_from_keys(
+                    UInt32Array::from_vec(gene_idx),
+                    Box::new(Utf8Array::<i32>::from_iter(genes.into_iter().map(Some))),
+                )
+                .map_err(PyPolarsErr::from)?,
+            ),
+        )
+        .map_err(PyPolarsErr::from)?;
+
+        let df = DataFrame::new(vec![genes, x, y, counts]).map_err(PyPolarsErr::from)?;
+
+        Ok(PyDataFrame(df))
     }
 }

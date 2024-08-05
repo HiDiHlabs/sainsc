@@ -16,6 +16,7 @@ ndarray-stats = { version = "0.5.1" }
 num           = { version = "0.4.1" }
 numpy         = { version = "0.21.0" }
 polars        = { version = "0.41", features = ["partition_by", "dtype-categorical"] }
+polars-arrow  = { version = "0.41" }
 pyo3          = { version = "0.21.0", features = ["extension-module"] }
 pyo3-polars   = { version = "0.15.0" }
 rayon         = { version = "1.8.0" }
