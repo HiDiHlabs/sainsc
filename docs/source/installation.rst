@@ -5,19 +5,17 @@ Installation
 PyPI and ``pip``
 ----------------
 
-``sainsc`` will soon be available to install from `PyPI <https://pypi.org/>`_.
+To install ``sainsc`` from `PyPI <https://pypi.org/>`_ using ``pip`` just run
 
-.. To install ``sainsc`` from `PyPI <https://pypi.org/>`_ using ``pip`` just run
+.. code-block:: bash
 
-.. .. code-block:: bash
+    pip install sainsc
 
-..     pip install sainsc
+If you want to have support for :py:mod:`spatialdata` use
 
-.. If you want to have support for :py:mod:`spatialdata` use
+.. code-block:: bash
 
-.. .. code-block:: bash
-
-..     pip install 'sainsc[spatialdata]'
+    pip install sainsc[spatialdata]
 
 
 Bioconda and ``conda``

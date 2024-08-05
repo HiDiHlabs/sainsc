@@ -36,6 +36,12 @@ This project follows the [SemVer](https://semver.org/) guidelines for versioning
 
 ## Citations
 
+If you are using `sainsc` for your research please cite
+
+Müller-Bötticher, N., Tiesmeyer, S., Eils, R., and Ishaque, N.
+"Sainsc: a computational tool for segmentation-free analysis of in-situ capture"
+bioRxiv (2024) https://doi.org/10.1101/2024.08.02.603879
+
 ## License
 
 This project is licensed under the MIT License - for details please refer to the
