@@ -8,6 +8,10 @@ from ._utils import _raise_module_load_error
 if TYPE_CHECKING:
     from pooch import Pooch
 
+# version tags have the format vX.Y.Z but __version__ is X.Y.Z
+# we need to modify it otherwise the url is incorrect
+version = "v" + __version__
+
 
 def _get_signature_pooch() -> "Pooch":
     # use indirection to enable pooch as optional dependency w/o lazy loading
@@ -17,7 +21,7 @@ def _get_signature_pooch() -> "Pooch":
         SIGNATURES = pooch.create(
             path=pooch.os_cache("sainsc"),
             base_url="https://github.com/HiDiHLabs/sainsc/raw/{version}/data/",
-            version=__version__,
+            version=version,
             version_dev="main",
             registry={
                 "signatures_brain.tsv": "sha256:1e7e3e959ea0a0efdfb8bff2ef1de368757a26f317088122a14dd0b141f7149e",
