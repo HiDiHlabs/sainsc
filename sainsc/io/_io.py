@@ -1,3 +1,4 @@
+from collections.abc import Collection
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, get_args
 
@@ -178,6 +179,85 @@ def read_StereoSeq(
         resolution = _get_gem_resolution(read_gem_header(filepath))
 
     return LazyKDE.from_dataframe(df, resolution=resolution, n_threads=n_threads)
+
+
+# Xenium
+
+_XENIUM_NEG_CTRLS = [
+    "^BLANK",
+    "^DeprecatedCodeword",
+    "^Intergenic",
+    "^NegControl",
+    "^UnassignedCodeword",
+]
+_XENUM_COLUMNS = {"feature_name": "gene", "x_location": "x", "y_location": "y"}
+
+
+def read_Xenium(
+    filepath: _PathLike,
+    *,
+    binsize: float = 0.5,
+    remove_features: Collection[str] = _XENIUM_NEG_CTRLS,
+    n_threads: int | None = None,
+) -> LazyKDE:
+    """
+    Read a Xenium transcripts file.
+
+    Parameters
+    ----------
+    filepath : os.PathLike or str
+        Path to the Xenium transcripts file. Both, csv.gz and parquet files, are supported.
+    binsize : float, optional
+        Size of each bin in um.
+    remove_features : collections.abc.Collection[str], optional
+        List of regex patterns to filter the 'feature_name' column.
+        For Xenium v3 parquet files the data is automatically filtered with the
+        'is_gene' column, as well.
+    column.
+    n_threads : int | None, optional
+        Number of threads used for reading and processing file. If `None` this will
+        default to the number of available CPUs.
+
+    Returns
+    -------
+    LazyKDE
+    """
+    if n_threads is None:
+        n_threads = _get_n_cpus()
+
+    filepath = Path(filepath)
+    columns = list(_XENUM_COLUMNS.keys())
+
+    if filepath.suffix == ".parquet":
+        transcripts = pl.scan_parquet(filepath)
+
+        # 'is_gene' column only exists for Xenium v3 which only has .parquet
+        if "is_gene" in transcripts.collect_schema().names():
+            transcripts = transcripts.filter(pl.col("is_gene"))
+
+        transcripts = (
+            transcripts.select(columns)
+            .with_columns(pl.col("feature_name").cast(pl.Categorical))
+            .collect()
+        )
+    else:
+        transcripts = pl.read_csv(
+            filepath,
+            columns=columns,
+            schema_overrides={"feature_name": pl.Categorical},
+            n_threads=n_threads,
+        )
+
+    transcripts = transcripts.rename(_XENUM_COLUMNS)
+
+    if len(remove_features) > 0:
+        transcripts = transcripts.filter(
+            ~pl.col("gene").cast(pl.Utf8).str.contains(f"({'|'.join(remove_features)})")
+        )
+
+    return LazyKDE.from_dataframe(
+        transcripts, binsize=binsize, resolution=1_000, n_threads=n_threads
+    )
 
 
 # Binned data
