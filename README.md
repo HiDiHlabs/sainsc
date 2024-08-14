@@ -21,9 +21,20 @@ by exporting data in [`AnnData`](https://anndata.readthedocs.io/) or
 
 ## Installation
 
-`sainsc` will be made available on [PyPI](https://pypi.org/) and
-[bioconda](https://bioconda.github.io/). For detailed installation instructions
-please refer to the [documentation](https://sainsc.readthedocs.io/en/stable/installation.html).
+`sainsc` is available on [PyPI](https://pypi.org/) and [bioconda](https://bioconda.github.io/).
+
+```sh
+# PyPI
+pip install sainsc
+```
+
+```sh
+# or conda
+conda install bioconda::sainsc
+```
+
+For detailed installation instructions please refer to the
+[documentation](https://sainsc.readthedocs.io/en/stable/installation.html).
 
 ## Documentation
 
