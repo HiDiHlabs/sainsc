@@ -317,10 +317,7 @@ class LazyKDE:
         if self.local_maxima is None:
             raise ValueError("`local_maxima` have to be identified before loading")
 
-        if genes is None:
-            genes = self.genes
-        else:
-            genes = list(genes)
+        genes = self.genes if genes is None else list(genes)
 
         kde = self._load_KDE_maxima(genes)
         adata = _localmax_anndata(
@@ -1054,19 +1051,17 @@ class LazyKDE:
         :py:meth:`sainsc.LazyKDE.assign_celltype`
         """
         if self.cosine_similarity is not None:
-            img = self.cosine_similarity
+            return self._plot_2d(
+                self.cosine_similarity,
+                "Cosine similarity",
+                remove_background=remove_background,
+                crop=crop,
+                scalebar=scalebar,
+                im_kwargs=im_kwargs,
+                scalebar_kwargs=scalebar_kwargs,
+            )
         else:
             raise ValueError("Cell types have not been assigned")
-
-        return self._plot_2d(
-            img,
-            "Cosine similarity",
-            remove_background=remove_background,
-            crop=crop,
-            scalebar=scalebar,
-            im_kwargs=im_kwargs,
-            scalebar_kwargs=scalebar_kwargs,
-        )
 
     def plot_assignment_score(
         self,
@@ -1103,19 +1098,17 @@ class LazyKDE:
         :py:meth:`sainsc.LazyKDE.assign_celltype`
         """
         if self.assignment_score is not None:
-            img = self.assignment_score
+            return self._plot_2d(
+                self.assignment_score,
+                "Assignment score",
+                remove_background=remove_background,
+                crop=crop,
+                scalebar=scalebar,
+                im_kwargs=im_kwargs,
+                scalebar_kwargs=scalebar_kwargs,
+            )
         else:
             raise ValueError("Cell types have not been assigned")
-
-        return self._plot_2d(
-            img,
-            "Assignment score",
-            remove_background=remove_background,
-            crop=crop,
-            scalebar=scalebar,
-            im_kwargs=im_kwargs,
-            scalebar_kwargs=scalebar_kwargs,
-        )
 
     ## Attributes
     @property
@@ -1133,10 +1126,8 @@ class LazyKDE:
     @n_threads.setter
     def n_threads(self, n_threads: int):
         if isinstance(n_threads, int) and n_threads >= 0:
-            if n_threads == 0:
-                n_threads = _get_n_cpus()
-            self._threads = n_threads
-            self.counts.n_threads = n_threads
+            self._threads = n_threads if n_threads > 0 else _get_n_cpus()
+            self.counts.n_threads = self._threads
         else:
             raise TypeError("`n_threads` must be an `int` >= 0.")
 
