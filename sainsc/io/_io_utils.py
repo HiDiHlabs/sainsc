@@ -3,10 +3,19 @@ from pathlib import Path
 from typing import Literal
 
 import numpy as np
+import polars as pl
 from numpy.typing import NDArray
 
 from .._typealias import _PathLike
 from .._utils_rust import categorical_coordinate
+
+
+def _bin_coordinates(df: pl.DataFrame, bin_size: float) -> pl.DataFrame:
+    df = df.with_columns(
+        (pl.col(i) - pl.col(i).min()).floordiv(bin_size).cast(pl.Int32, strict=True)
+        for i in ["x", "y"]
+    )
+    return df
 
 
 def _categorical_coordinate(

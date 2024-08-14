@@ -8,23 +8,34 @@ from anndata import AnnData
 from scipy.sparse import csr_matrix
 
 from .._typealias import _PathLike
-from .._utils import (
-    _bin_coordinates,
-    _get_coordinate_index,
-    _get_n_cpus,
-    _raise_module_load_error,
-)
-from .._utils_rust import GridCounts
+from .._utils import _get_coordinate_index, _get_n_cpus, _raise_module_load_error
 from ..lazykde import LazyKDE
-from ._io_utils import _categorical_coordinate, _open_file
+from ._io_utils import _bin_coordinates, _categorical_coordinate, _open_file
 from ._stereoseq_chips import CHIP_RESOLUTION
 
 if TYPE_CHECKING:
     from spatialdata import SpatialData
 
 
-# Stereo-seq
-def _get_stereo_header(filepath: _PathLike) -> dict[str, str]:
+# Stereo-seq (and other GEM data)
+
+# according to specification the name should be MIDCount
+# however the datasets published in the original Stereo-seq publication used
+# various names for the count column
+_Gem_Count_ColName = Literal["MIDCount", "MIDCounts", "UMICount"]
+_count_column_options = get_args(_Gem_Count_ColName)
+
+_GEM_SCHEMA_OVERRIDE = {
+    "geneID": pl.Categorical,
+    "geneName": pl.Categorical,
+    "x": pl.UInt32,
+    "y": pl.UInt32,
+    "ExonCount": pl.UInt32,
+    "CellID": pl.UInt32,
+} | {name: pl.UInt32 for name in _count_column_options}
+
+
+def read_gem_header(filepath: _PathLike) -> dict[str, str]:
     header = dict()
     with _open_file(filepath, "rb") as f:
         for line in f:
@@ -37,10 +48,30 @@ def _get_stereo_header(filepath: _PathLike) -> dict[str, str]:
     return header
 
 
-def _get_stereo_resolution(name: str) -> int | None:
-    for chip_name in CHIP_RESOLUTION.keys():
-        if name.startswith(chip_name):
-            return CHIP_RESOLUTION[chip_name]
+def _get_resolution_from_chip(chip_name: str) -> int | None:
+    for chip_prefix, resolution in CHIP_RESOLUTION.items():
+        if chip_name.startswith(chip_prefix):
+            return resolution
+
+
+def _get_gem_resolution(gem_header: dict[str, str]) -> int | None:
+    # TODO the name of the field is wrong????
+    if (chip := gem_header.get("StereoChip")) is not None:
+        return _get_resolution_from_chip(chip)
+
+
+def _prepare_gem_dataframe(
+    df: pl.DataFrame, exon_count: bool, gene_name: bool
+) -> pl.DataFrame:
+    if exon_count:
+        count_col = "ExonCount"
+    else:
+        count_col = [name for name in _count_column_options if name in df.columns][0]
+
+    gene_col = "geneName" if gene_name else "geneID"
+
+    df = df.rename({count_col: "count", gene_col: "gene"})
+    return df.select(["gene", "x", "y", "count"])
 
 
 def read_gem_file(
@@ -51,9 +82,8 @@ def read_gem_file(
 
     GEM files are used by e.g. Stereo-Seq and Nova-ST.
 
-    The gene-ID and count column will be renamed to `gene` and `count`, respectively.
-
-    The name of the count column must be one of `MIDCounts`, `MIDCount`, or `UMICount`.
+    The name of the count column should be 'MIDCount', however,
+    `MIDCounts` and `UMICount` are supported.
 
     Parameters
     ----------
@@ -76,38 +106,35 @@ def read_gem_file(
     ValueError
         If count column has an unknown name.
     """
-    # according to specification the name should be MIDCount
-    # however the datasets published in the original Stereo-seq publication used
-    # various names for the count column
-    _Count_ColName = Literal["MIDCounts", "MIDCount", "UMICount"]
-    options = get_args(_Count_ColName)
+
+    filepath = Path(filepath)
 
     if n_threads is None:
         n_threads = _get_n_cpus()
 
     df = pl.read_csv(
-        Path(filepath),
+        filepath,
         separator=sep,
         comment_prefix="#",
-        schema_overrides={"geneID": pl.Categorical, "x": pl.Int32, "y": pl.Int32}
-        | {n: pl.UInt32 for n in options},
+        schema_overrides=_GEM_SCHEMA_OVERRIDE,
         n_threads=n_threads,
         **kwargs,
     )
 
-    for name in options:
-        if name in df.columns:
-            return df.rename({name: "count", "geneID": "gene"})
+    if not any(name in df.columns for name in _count_column_options):
+        raise ValueError(
+            f"Unknown count column, one of {_count_column_options} must be present."
+        )
 
-    raise ValueError(
-        f"Unknown count column, the name of the column must be one of {options}"
-    )
+    return df
 
 
 def read_StereoSeq(
     filepath: _PathLike,
     *,
     resolution: float | None = None,
+    gene_name: bool = False,
+    exon_count: bool = False,
     sep: str = "\t",
     n_threads: int | None = None,
     **kwargs,
@@ -123,6 +150,12 @@ def read_StereoSeq(
         Center-to-center distance of Stere-seq beads in nm, if None
         it will try to detect it from the chip definition in the file header
         if one exists.
+    gene_name : bool
+        If True will use the 'geneName' column otherwise the 'geneID' column is used
+        as gene identifier.
+    exon_count : bool
+        If True will use the 'ExonCount' column otherwise the 'MIDCount' column is used
+        as counts.
     sep : str, optional
         Separator used in :py:func:`polars.read_csv`.
     n_threads : int, optional
@@ -138,18 +171,16 @@ def read_StereoSeq(
     if n_threads is None:
         n_threads = _get_n_cpus()
 
-    if resolution is None:
-        chip = _get_stereo_header(filepath).get("StereoChip")
-        if chip is not None:
-            resolution = _get_stereo_resolution(chip)
-
     df = read_gem_file(filepath, sep=sep, n_threads=n_threads, **kwargs)
+    df = _prepare_gem_dataframe(df, exon_count=exon_count, gene_name=gene_name)
 
-    counts = GridCounts.from_dataframe(
-        df, binsize=None, resolution=resolution, n_threads=n_threads
-    )
+    if resolution is None:
+        resolution = _get_gem_resolution(read_gem_header(filepath))
 
-    return LazyKDE(counts, n_threads=n_threads)
+    return LazyKDE.from_dataframe(df, resolution=resolution, n_threads=n_threads)
+
+
+# Binned data
 
 
 def read_StereoSeq_bins(
@@ -158,6 +189,8 @@ def read_StereoSeq_bins(
     *,
     spatialdata: bool = False,
     resolution: float | None = None,
+    gene_name: bool = False,
+    exon_count: bool = False,
     sep: str = "\t",
     n_threads: int | None = None,
     **kwargs,
@@ -178,6 +211,12 @@ def read_StereoSeq_bins(
         Center-to-center distance of Stere-seq beads in nm, if None
         it will try to detect it from the chip definition in the file header
         if one exists.
+    gene_name : bool
+        If True will use the 'geneName' column otherwise the 'geneID' column is used
+        as gene identifier.
+    exon_count : bool
+        If True will use the 'ExonCount' column otherwise the 'MIDCount' column is used
+        as counts.
     sep : str, optional
         Separator used in :py:func:`polars.read_csv`.
     n_threads : int, optional
@@ -200,35 +239,36 @@ def read_StereoSeq_bins(
     if n_threads is None:
         n_threads = _get_n_cpus()
 
-    header = _get_stereo_header(filepath)
     df = read_gem_file(filepath, sep=sep, n_threads=n_threads, **kwargs)
-    df = df.with_columns(pl.col(i) - pl.col(i).min() for i in ["x", "y"])
-    df = _bin_coordinates(df.to_pandas(), bin_size)
+    df = _prepare_gem_dataframe(df, exon_count=exon_count, gene_name=gene_name)
+    df = _bin_coordinates(df, bin_size)
 
     coord_codes, coordinates = _categorical_coordinate(
-        df.pop("x").to_numpy(), df.pop("y").to_numpy(), n_threads=n_threads
+        df["x"].to_numpy(), df["y"].to_numpy(), n_threads=n_threads
     )
+    df = df.drop(["x", "y"])
+
+    genes = pd.DataFrame(index=pd.Index(df["gene"].cat.get_categories(), name="gene"))
 
     # Duplicate entries in csr_matrix are summed which automatically gives bin merging
     counts = csr_matrix(
-        (df.pop("count"), (coord_codes, df["gene"].cat.codes)),
-        shape=(coordinates.shape[0], df["gene"].cat.categories.size),
+        (df["count"], (coord_codes, df["gene"].to_physical())),
+        shape=(coordinates.shape[0], df["gene"].cat.get_categories().shape[0]),
         dtype=np.int32,
     )
 
-    del coord_codes
+    del coord_codes, df
 
     obs = pd.DataFrame(
         index=_get_coordinate_index(
             coordinates[:, 0], coordinates[:, 1], name="bin", n_threads=n_threads
         )
     )
-    genes = pd.DataFrame(index=pd.Index(df["gene"].cat.categories, name="gene"))
+
+    header = read_gem_header(filepath)
 
     if resolution is None:
-        chip = header.get("StereoChip")
-        if chip is not None:
-            resolution = _get_stereo_resolution(chip)
+        resolution = _get_gem_resolution(header)
 
     adata = AnnData(
         X=counts,

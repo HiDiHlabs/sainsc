@@ -27,18 +27,6 @@ def _get_coordinate_index(
     )
 
 
-def _bin_coordinates(df: pd.DataFrame, bin_size: float) -> pd.DataFrame:
-    df = df.assign(
-        x=lambda df: _get_bin_coordinate(df["x"].to_numpy(), bin_size),
-        y=lambda df: _get_bin_coordinate(df["y"].to_numpy(), bin_size),
-    )
-    return df
-
-
-def _get_bin_coordinate(coor: NDArray[np.number], bin_size: float) -> NDArray[np.int32]:
-    return np.floor(coor / bin_size).astype(np.int32, copy=False)
-
-
 def _raise_module_load_error(e: Exception, fn: str, pkg: str, extra: str) -> NoReturn:
     raise ModuleNotFoundError(
         f"`{fn}` requires '{pkg}' to be installed, e.g. via the '{extra}' extra."
