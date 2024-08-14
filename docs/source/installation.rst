@@ -5,7 +5,8 @@ Installation
 PyPI and ``pip``
 ----------------
 
-To install ``sainsc`` from `PyPI <https://pypi.org/>`_ using ``pip`` just run
+To install ``sainsc`` from `PyPI <https://pypi.org/project/sainsc/>`_ using ``pip``
+just run
 
 .. code-block:: bash
 
@@ -21,23 +22,18 @@ If you want to have support for :py:mod:`spatialdata` use
 Bioconda and ``conda``
 ----------------------
 
-``sainsc`` is not yet available for
-`Miniconda <https://docs.conda.io/en/latest/miniconda.html>`_ installations. But we are
-planning to add it to the `bioconda <https://bioconda.github.io/>`_ channel soon.
+If you prefer the installation using
+`Miniconda <https://docs.anaconda.com/miniconda/>`_ you can install from the
+`bioconda <https://bioconda.github.io/>`_ channel.
 
+.. code-block:: bash
 
-.. Alternatively, if you prefer the installation using
-.. `Miniconda <https://docs.conda.io/en/latest/miniconda.html>`_ you can do that from the
-.. `bioconda <https://bioconda.github.io/>`_ channel.
+    conda install bioconda::sainsc
 
-.. .. code-block:: bash
+.. note::
 
-..     conda install -c bioconda sainsc
-
-.. .. note::
-
-..     Of course, it is also possible to use ``mamba`` instead of ``conda``
-..     to speed up the installation.
+    Of course, it is also possible to use ``mamba`` instead of ``conda``
+    to speed up the installation.
 
 
 From GitHub
