@@ -195,7 +195,7 @@ _XENIUM_NEG_CTRLS = [
     "^NegControl",
     "^UnassignedCodeword",
 ]
-_XENUM_COLUMNS = {"feature_name": "gene", "x_location": "x", "y_location": "y"}
+_XENIUM_COLUMNS = {"feature_name": "gene", "x_location": "x", "y_location": "y"}
 
 
 def read_Xenium(
@@ -231,7 +231,7 @@ def read_Xenium(
         n_threads = _get_n_cpus()
 
     filepath = Path(filepath)
-    columns = list(_XENUM_COLUMNS.keys())
+    columns = list(_XENIUM_COLUMNS.keys())
 
     if filepath.suffix == ".parquet":
         transcripts = pl.scan_parquet(filepath)
@@ -253,7 +253,7 @@ def read_Xenium(
             n_threads=n_threads,
         )
 
-    transcripts = transcripts.rename(_XENUM_COLUMNS)
+    transcripts = transcripts.rename(_XENIUM_COLUMNS)
 
     if len(remove_features) > 0:
         transcripts = transcripts.filter(
