@@ -11,7 +11,12 @@ from scipy.sparse import csr_matrix
 from .._typealias import _PathLike
 from .._utils import _get_coordinate_index, _get_n_cpus, _raise_module_load_error
 from ..lazykde import LazyKDE
-from ._io_utils import _bin_coordinates, _categorical_coordinate, _open_file
+from ._io_utils import (
+    _bin_coordinates,
+    _categorical_coordinate,
+    _filter_genes,
+    _open_file,
+)
 from ._stereoseq_chips import CHIP_RESOLUTION
 
 if TYPE_CHECKING:
@@ -252,11 +257,7 @@ def read_Xenium(
         )
 
     transcripts = transcripts.rename(_XENIUM_COLUMNS)
-
-    if len(remove_features) > 0:
-        transcripts = transcripts.filter(
-            ~pl.col("gene").cast(pl.Utf8).str.contains(f"({'|'.join(remove_features)})")
-        )
+    transcripts = _filter_genes(transcripts, remove_features)
 
     return LazyKDE.from_dataframe(
         transcripts, binsize=binsize, resolution=1_000, n_threads=n_threads

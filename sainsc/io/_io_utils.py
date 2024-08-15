@@ -1,4 +1,5 @@
 import gzip
+from collections.abc import Collection
 from pathlib import Path
 from typing import Literal
 
@@ -24,6 +25,14 @@ def _categorical_coordinate(
     assert len(x) == len(y)
 
     return categorical_coordinate(x, y, n_threads=n_threads)
+
+
+def _filter_genes(df: pl.DataFrame, remove_features: Collection[str]) -> pl.DataFrame:
+    if len(remove_features) > 0:
+        df = df.filter(
+            ~pl.col("gene").cast(pl.Utf8).str.contains(f"({'|'.join(remove_features)})")
+        )
+    return df
 
 
 # currently no need to support all file modes
