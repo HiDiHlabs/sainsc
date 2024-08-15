@@ -264,6 +264,55 @@ def read_Xenium(
     )
 
 
+# Vizgen
+
+_VIZGEN_NEG_CTRLS = ["^Blank"]
+_VIZGEN_COLUMNS = {"gene": "gene", "global_x": "x", "global_y": "y"}
+
+
+def read_Vizgen(
+    filepath: _PathLike,
+    *,
+    binsize: float = 0.5,
+    remove_genes: Collection[str] = _VIZGEN_NEG_CTRLS,
+    n_threads: int | None = None,
+) -> LazyKDE:
+    """
+    Read a Vizgen transcripts file.
+
+    Parameters
+    ----------
+    filepath : os.PathLike or str
+        Path to the Vizgen transcripts file.
+    binsize : float, optional
+        Size of each bin in um.
+    remove_genes : collections.abc.Collection[str], optional
+        List of regex patterns to filter the 'gene' column.
+    n_threads : int | None, optional
+        Number of threads used for reading and processing file. If `None` this will
+        default to the number of available CPUs.
+
+    Returns
+    -------
+    LazyKDE
+    """
+    if n_threads is None:
+        n_threads = _get_n_cpus()
+
+    transcripts = pl.read_csv(
+        Path(filepath),
+        columns=list(_VIZGEN_COLUMNS.keys()),
+        schema_overrides={"gene": pl.Categorical},
+        n_threads=n_threads,
+    ).rename(_VIZGEN_COLUMNS)
+
+    transcripts = _filter_genes(transcripts, remove_genes)
+
+    return LazyKDE.from_dataframe(
+        transcripts, binsize=binsize, resolution=1_000, n_threads=n_threads
+    )
+
+
 # Binned data
 
 
