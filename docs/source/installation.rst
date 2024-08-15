@@ -24,7 +24,7 @@ Bioconda and ``conda``
 
 If you prefer the installation using
 `Miniconda <https://docs.anaconda.com/miniconda/>`_ you can install from the
-`bioconda <https://bioconda.github.io/>`_ channel.
+`bioconda <http://bioconda.github.io/recipes/sainsc/README.html>`_ channel.
 
 .. code-block:: bash
 
