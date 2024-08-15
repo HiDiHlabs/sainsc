@@ -50,15 +50,20 @@ def read_gem_header(filepath: _PathLike) -> dict[str, str]:
 
 
 def _get_resolution_from_chip(chip_name: str) -> int | None:
-    for chip_prefix, resolution in CHIP_RESOLUTION.items():
+    # sort prefixes by length, otherwise if testing a shorter prefix first
+    # which is a subprefix of another one it might return wrong result
+    chip_prefixes = sorted(CHIP_RESOLUTION.keys(), key=len, reverse=True)
+    for chip_prefix in chip_prefixes:
         if chip_name.startswith(chip_prefix):
-            return resolution
+            return CHIP_RESOLUTION[chip_prefix]
 
 
 def _get_gem_resolution(gem_header: dict[str, str]) -> int | None:
-    # TODO the name of the field is wrong????
-    if (chip := gem_header.get("StereoChip")) is not None:
-        return _get_resolution_from_chip(chip)
+    # The field name according to spec is 'Stereo-seqChip' but in the datasets published
+    # in the original publication of Stereo-seq we also find 'StereoChip'
+    for field in ["Stereo-seqChip", "StereoChip"]:
+        if (chip := gem_header.get(field)) is not None:
+            return _get_resolution_from_chip(chip)
 
 
 def _prepare_gem_dataframe(
