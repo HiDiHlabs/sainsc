@@ -113,13 +113,11 @@ def read_gem_file(
         If count column has an unknown name.
     """
 
-    filepath = Path(filepath)
-
     if n_threads is None:
         n_threads = _get_n_cpus()
 
     df = pl.read_csv(
-        filepath,
+        Path(filepath),
         separator=sep,
         comment_prefix="#",
         schema_overrides=_GEM_SCHEMA_OVERRIDE,
