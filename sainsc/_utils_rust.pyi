@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from polars import DataFrame
+from typing_extensions import Self
 
 from ._typealias import _Csx, _CsxArray
 
@@ -109,7 +110,7 @@ class GridCounts:
         resolution: float | None = None,
         binsize: float | None = None,
         n_threads: int | None = None,
-    ):  # -> Self
+    ) -> Self:
         """
         Initialize from dataframe.
 
