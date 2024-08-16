@@ -202,22 +202,22 @@ def read_StereoSeq(
 
 
 # Xenium
-
-_XENIUM_NEG_CTRLS = [
+_XENIUM_COLUMNS = {"feature_name": "gene", "x_location": "x", "y_location": "y"}
+XENIUM_CTRLS = [
     "^BLANK",
     "^DeprecatedCodeword",
     "^Intergenic",
     "^NegControl",
     "^UnassignedCodeword",
 ]
-_XENIUM_COLUMNS = {"feature_name": "gene", "x_location": "x", "y_location": "y"}
+"""Patterns for Xenium controls"""
 
 
 def read_Xenium(
     filepath: _PathLike,
     *,
     binsize: float = 0.5,
-    remove_features: Collection[str] = _XENIUM_NEG_CTRLS,
+    remove_features: Collection[str] = XENIUM_CTRLS,
     n_threads: int | None = None,
 ) -> LazyKDE:
     """
@@ -230,7 +230,8 @@ def read_Xenium(
     binsize : float, optional
         Size of each bin in um.
     remove_features : collections.abc.Collection[str], optional
-        List of regex patterns to filter the 'feature_name' column.
+        List of regex patterns to filter the 'feature_name' column,
+        :py:attr:`sainsc.io.XENIUM_CTRLS` by default.
         For Xenium v3 parquet files the data is automatically filtered with the
         'is_gene' column, as well.
     column.
@@ -240,7 +241,7 @@ def read_Xenium(
 
     Returns
     -------
-    LazyKDE
+    sainsc.LazyKDE
     """
     if n_threads is None:
         n_threads = _get_n_cpus()
@@ -278,15 +279,16 @@ def read_Xenium(
 
 # Vizgen
 
-_VIZGEN_NEG_CTRLS = ["^Blank"]
 _VIZGEN_COLUMNS = {"gene": "gene", "global_x": "x", "global_y": "y"}
+VIZGEN_CTRLS = ["^Blank"]
+"""Patterns for Vizgen controls"""
 
 
 def read_Vizgen(
     filepath: _PathLike,
     *,
     binsize: float = 0.5,
-    remove_genes: Collection[str] = _VIZGEN_NEG_CTRLS,
+    remove_genes: Collection[str] = VIZGEN_CTRLS,
     n_threads: int | None = None,
 ) -> LazyKDE:
     """
@@ -299,14 +301,15 @@ def read_Vizgen(
     binsize : float, optional
         Size of each bin in um.
     remove_genes : collections.abc.Collection[str], optional
-        List of regex patterns to filter the 'gene' column.
+        List of regex patterns to filter the 'gene' column,
+        :py:attr:`sainsc.io.VIZGEN_CTRLS` by default.
     n_threads : int | None, optional
         Number of threads used for reading and processing file. If `None` this will
         default to the number of available CPUs.
 
     Returns
     -------
-    LazyKDE
+    sainsc.LazyKDE
     """
     if n_threads is None:
         n_threads = _get_n_cpus()
