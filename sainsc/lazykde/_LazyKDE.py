@@ -1153,7 +1153,7 @@ class LazyKDE:
         return self.counts.resolution
 
     @resolution.setter
-    def resolution(self, resolution: float):
+    def resolution(self, resolution: float | None):
         self.counts.resolution = resolution
 
     @property
@@ -1266,7 +1266,7 @@ class LazyKDE:
             f"shape: {self.shape}",
         ]
         if self.resolution is not None:
-            repr.append(f"resolution: {self.resolution} nm / px")
+            repr.append(f"resolution: {self.resolution:.1f} nm / px")
         if self.kernel is not None:
             repr.append(f"kernel: {self.kernel.shape}")
         if self.background is not None:

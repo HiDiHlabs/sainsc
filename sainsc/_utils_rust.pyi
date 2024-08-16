@@ -252,7 +252,7 @@ class GridCounts:
         """
 
     @resolution.setter
-    def resolution(self, resolution: float): ...
+    def resolution(self, resolution: float | None): ...
     @property
     def n_threads(self) -> int:
         """

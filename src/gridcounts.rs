@@ -279,11 +279,15 @@ impl GridCounts {
     }
 
     fn __str__(&self) -> String {
-        let repr = [
+        let mut repr = vec![
             format!("GridCounts ({} threads)", self.n_threads),
             format!("genes: {}", self.counts.len()),
             format!("shape: {:?}", self.shape),
         ];
+        if let Some(res) = self.resolution {
+            repr.push(format!("resolution: {:.1} nm / px", res));
+        }
+
         repr.join("\n    ")
     }
 
@@ -299,14 +303,15 @@ impl GridCounts {
     }
 
     #[setter]
-    fn set_resolution(&mut self, resolution: f32) -> PyResult<()> {
-        if resolution > 0. {
-            self.resolution = Some(resolution);
-            Ok(())
-        } else {
-            Err(PyValueError::new_err(
+    fn set_resolution(&mut self, resolution: Option<f32>) -> PyResult<()> {
+        match resolution {
+            Some(res) if res <= 0. => Err(PyValueError::new_err(
                 "`resolution` must be greater than zero",
-            ))
+            )),
+            _ => {
+                self.resolution = resolution;
+                Ok(())
+            }
         }
     }
 
