@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from typing import Protocol, TypeVar, type_check_only
+from typing import Protocol, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -66,7 +66,6 @@ def _localmax_anndata(
     )
 
 
-@type_check_only
 class CosineCelltypeCallable(Protocol):
     def __call__(
         self,
