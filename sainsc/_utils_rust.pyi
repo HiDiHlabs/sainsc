@@ -93,8 +93,8 @@ class GridCounts:
         resolution : float, optional
             Resolution as nm / pixel.
         n_threads : int, optional
-            Number of threads used for reading and processing file. If `None` this will
-            default to the number of logical CPUs.
+            Number of threads used for processing. If `None` or 0 this will default to
+            the number of logical CPUs.
 
         Raises
         ------
@@ -128,8 +128,8 @@ class GridCounts:
             Resolution of each coordinate unit in nm. The default is 1,000 i.e. measurements
             are in um.
         n_threads : int, optional
-            Number of threads used for initializing :py:class:`sainsc.LazyKDE`.
-            If `None` this will default to the number of logical CPUs.
+            Number of threads used for processing. If `None` or 0 this will default to
+            the number of logical CPUs.
 
         Returns
         -------
@@ -265,4 +265,4 @@ class GridCounts:
         """
 
     @n_threads.setter
-    def n_threads(self, n_threads: int): ...
+    def n_threads(self, n_threads: int | None): ...

@@ -78,7 +78,6 @@ impl GridCounts {
         resolution: Option<f32>,
         n_threads: Option<usize>,
     ) -> PyResult<Self> {
-        let n_threads = n_threads.unwrap_or(0);
         let threadpool =
             create_pool(n_threads).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
@@ -98,6 +97,8 @@ impl GridCounts {
 
             *shapes.first().expect("Length is non-zero")
         };
+
+        let n_threads = threadpool.current_num_threads();
 
         Ok(Self {
             counts,
@@ -198,9 +199,9 @@ impl GridCounts {
             Ok((counts_dict, shape))
         }
 
-        let n_threads = n_threads.unwrap_or(0);
         let threadpool =
             create_pool(n_threads).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let n_threads = threadpool.current_num_threads();
 
         let resolution = resolution.map(|r| r * binsize.unwrap_or(1.));
 
@@ -310,10 +311,11 @@ impl GridCounts {
     }
 
     #[setter]
-    fn set_n_threads(&mut self, n_threads: usize) -> PyResult<()> {
-        self.n_threads = n_threads;
+    fn set_n_threads(&mut self, n_threads: Option<usize>) -> PyResult<()> {
         self.threadpool =
             create_pool(n_threads).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        self.n_threads = self.threadpool.current_num_threads();
+
         Ok(())
     }
 

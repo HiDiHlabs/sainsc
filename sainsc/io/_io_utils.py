@@ -20,7 +20,7 @@ def _bin_coordinates(df: pl.DataFrame, bin_size: float) -> pl.DataFrame:
 
 
 def _categorical_coordinate(
-    x: NDArray[np.int32], y: NDArray[np.int32], *, n_threads: int = 1
+    x: NDArray[np.int32], y: NDArray[np.int32], *, n_threads: int | None = None
 ) -> tuple[NDArray[np.int32], NDArray[np.int32]]:
     assert len(x) == len(y)
 

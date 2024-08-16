@@ -58,12 +58,7 @@ pub fn kde_at_coord<'py>(
 
     let coordinates = (coordinates.0.as_array(), coordinates.1.as_array());
 
-    match kde_at_coord_(
-        &gene_counts,
-        kernel.as_array(),
-        coordinates,
-        n_threads.unwrap_or(0),
-    ) {
+    match kde_at_coord_(&gene_counts, kernel.as_array(), coordinates, n_threads) {
         Err(e) => Err(PyRuntimeError::new_err(e.to_string())),
         Ok(kde_coord) => Ok(WrappedCsx(kde_coord)),
     }
@@ -136,7 +131,7 @@ fn kde_at_coord_<C, I, F, I2>(
     counts: &[CsMatViewI<C, I>],
     kernel: ArrayView2<F>,
     coordinates: (ArrayView1<I2>, ArrayView1<I2>),
-    n_threads: usize,
+    n_threads: Option<usize>,
 ) -> Result<CsMatI<F, usize>, ThreadPoolBuildError>
 where
     C: NumCast + Copy + Sync + Send,
@@ -146,6 +141,8 @@ where
     Slice: From<Range<I>>,
 {
     let pool = create_pool(n_threads)?;
+    let n_threads = pool.current_num_threads();
+
     let shape = counts.first().expect("At least one gene").shape();
 
     let coord_x = coordinates
@@ -286,7 +283,7 @@ mod tests {
             &counts,
             setup.kernel.view(),
             (coord_x.view(), coord_y.view()),
-            1,
+            None,
         )
         .unwrap();
 

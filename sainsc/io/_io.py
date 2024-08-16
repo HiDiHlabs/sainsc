@@ -9,7 +9,7 @@ from anndata import AnnData
 from scipy.sparse import csr_matrix
 
 from .._typealias import _PathLike
-from .._utils import _get_coordinate_index, _get_n_cpus, _raise_module_load_error
+from .._utils import _get_coordinate_index, _raise_module_load_error, validate_threads
 from ..lazykde import LazyKDE
 from ._io_utils import (
     _bin_coordinates,
@@ -97,6 +97,7 @@ def _prepare_gem_dataframe(
     return df.select(["gene", "x", "y", "count"])
 
 
+@validate_threads
 def read_gem_file(
     filepath: _PathLike, *, sep: str = "\t", n_threads: int | None = None, **kwargs
 ) -> pl.DataFrame:
@@ -115,7 +116,7 @@ def read_gem_file(
     sep : str, optional
         Separator used in :py:func:`polars.read_csv`.
     n_threads : int, optional
-        Number of threads used for reading and processing file. If `None` this will
+        Number of threads used for reading file and processing. If `None` or 0 this will
         default to the number of available CPUs.
     kwargs
         Other keyword arguments will be passed to :py:func:`polars.read_csv`.
@@ -129,9 +130,6 @@ def read_gem_file(
     ValueError
         If count column has an unknown name.
     """
-
-    if n_threads is None:
-        n_threads = _get_n_cpus()
 
     df = pl.read_csv(
         Path(filepath),
@@ -150,6 +148,7 @@ def read_gem_file(
     return df
 
 
+@validate_threads
 def read_StereoSeq(
     filepath: _PathLike,
     *,
@@ -180,7 +179,7 @@ def read_StereoSeq(
     sep : str, optional
         Separator used in :py:func:`polars.read_csv`.
     n_threads : int, optional
-        Number of threads used for reading and processing file. If `None` this will
+        Number of threads used for reading file and processing. If `None` or 0 this will
         default to the number of available CPUs.
     kwargs
         Other keyword arguments will be passed to :py:func:`polars.read_csv`.
@@ -189,8 +188,6 @@ def read_StereoSeq(
     -------
     sainsc.LazyKDE
     """
-    if n_threads is None:
-        n_threads = _get_n_cpus()
 
     df = read_gem_file(filepath, sep=sep, n_threads=n_threads, **kwargs)
     df = _prepare_gem_dataframe(df, exon_count=exon_count, gene_name=gene_name)
@@ -213,6 +210,7 @@ XENIUM_CTRLS = [
 """Patterns for Xenium controls"""
 
 
+@validate_threads
 def read_Xenium(
     filepath: _PathLike,
     *,
@@ -236,16 +234,13 @@ def read_Xenium(
         'is_gene' column, as well.
     column.
     n_threads : int | None, optional
-        Number of threads used for reading and processing file. If `None` this will
+        Number of threads used for reading file and processing. If `None` or 0 this will
         default to the number of available CPUs.
 
     Returns
     -------
     sainsc.LazyKDE
     """
-    if n_threads is None:
-        n_threads = _get_n_cpus()
-
     filepath = Path(filepath)
     columns = list(_XENIUM_COLUMNS.keys())
 
@@ -284,6 +279,7 @@ VIZGEN_CTRLS = ["^Blank"]
 """Patterns for Vizgen controls"""
 
 
+@validate_threads
 def read_Vizgen(
     filepath: _PathLike,
     *,
@@ -304,15 +300,13 @@ def read_Vizgen(
         List of regex patterns to filter the 'gene' column,
         :py:attr:`sainsc.io.VIZGEN_CTRLS` by default.
     n_threads : int | None, optional
-        Number of threads used for reading and processing file. If `None` this will
+        Number of threads used for reading file and processing. If `None` or 0 this will
         default to the number of available CPUs.
 
     Returns
     -------
     sainsc.LazyKDE
     """
-    if n_threads is None:
-        n_threads = _get_n_cpus()
 
     transcripts = pl.read_csv(
         Path(filepath),
@@ -331,6 +325,7 @@ def read_Vizgen(
 # Binned data
 
 
+@validate_threads
 def read_StereoSeq_bins(
     filepath: _PathLike,
     bin_size: int = 50,
@@ -368,7 +363,7 @@ def read_StereoSeq_bins(
     sep : str, optional
         Separator used in :py:func:`polars.read_csv`.
     n_threads : int, optional
-        Number of threads used for reading and processing file. If `None` this will
+        Number of threads used for reading file and processing. If `None` or 0 this will
         default to the number of available CPUs.
     kwargs
         Other keyword arguments will be passed to :py:func:`polars.read_csv`.
@@ -384,9 +379,6 @@ def read_StereoSeq_bins(
     ModuleNotFoundError
         If `spatialdata` is set to `True` but the package is not installed.
     """
-    if n_threads is None:
-        n_threads = _get_n_cpus()
-
     df = read_gem_file(filepath, sep=sep, n_threads=n_threads, **kwargs)
     df = _prepare_gem_dataframe(df, exon_count=exon_count, gene_name=gene_name)
     df = _bin_coordinates(df, bin_size)

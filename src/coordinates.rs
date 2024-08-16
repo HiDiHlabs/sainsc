@@ -19,7 +19,7 @@ pub fn coordinate_as_string<'py>(
     y: PyReadonlyArray1<'py, CoordInt>,
     n_threads: Option<usize>,
 ) -> PyResult<Bound<'py, PyArray1<PyFixedString<12>>>> {
-    match string_coordinate_index_(x.as_array(), y.as_array(), n_threads.unwrap_or(0)) {
+    match string_coordinate_index_(x.as_array(), y.as_array(), n_threads) {
         Ok(string_coordinates) => Ok(string_coordinates
             .map(|s| (*s).into())
             .into_pyarray_bound(py)),
@@ -39,7 +39,7 @@ pub fn categorical_coordinate<'py>(
     Bound<'py, PyArray1<CodeInt>>,
     Bound<'py, PyArray2<CoordInt>>,
 )> {
-    match categorical_coordinate_(x.as_array(), y.as_array(), n_threads.unwrap_or(0)) {
+    match categorical_coordinate_(x.as_array(), y.as_array(), n_threads) {
         Ok((codes, coordinates)) => Ok((
             codes.into_pyarray_bound(py),
             coordinates.into_pyarray_bound(py),
@@ -54,7 +54,7 @@ pub fn categorical_coordinate<'py>(
 fn string_coordinate_index_<'a, X, const N: usize>(
     x: ArrayView1<'a, X>,
     y: ArrayView1<'a, X>,
-    n_threads: usize,
+    n_threads: Option<usize>,
 ) -> Result<Array1<[u8; N]>, ThreadPoolBuildError>
 where
     X: Display,
@@ -82,7 +82,7 @@ where
 fn categorical_coordinate_<'a, C, X>(
     x: ArrayView1<'a, X>,
     y: ArrayView1<'a, X>,
-    n_threads: usize,
+    n_threads: Option<usize>,
 ) -> Result<(Array1<C>, Array2<X>), ThreadPoolBuildError>
 where
     C: PrimInt + Sync + Send + AddAssign,
@@ -138,7 +138,7 @@ mod tests {
         let a = array![0, 1, 99_999];
         let b = array![0, 20, 99_999];
 
-        let a_b: Array1<[u8; 12]> = string_coordinate_index_(a.view(), b.view(), 1).unwrap();
+        let a_b: Array1<[u8; 12]> = string_coordinate_index_(a.view(), b.view(), None).unwrap();
 
         let a_b_string: Vec<[u8; 12]> = vec![
             [48, 95, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -154,7 +154,7 @@ mod tests {
         let b = array![0, 1, 0, 0, 1];
 
         let (codes, coord): (Array1<i32>, Array2<i32>) =
-            categorical_coordinate_(a.view(), b.view(), 1).unwrap();
+            categorical_coordinate_(a.view(), b.view(), None).unwrap();
 
         let codes_test = array![0, 1, 2, 0, 3];
         let coord_test = array![[0, 0], [0, 1], [1, 0], [1, 1]];

@@ -21,7 +21,7 @@ from skimage.feature import peak_local_max
 from typing_extensions import Self
 
 from .._typealias import _Cmap, _Csx, _CsxArray, _Local_Max, _RangeTuple2D
-from .._utils import _get_n_cpus, _raise_module_load_error
+from .._utils import _raise_module_load_error, _validate_n_threads, validate_threads
 from .._utils_rust import (
     GridCounts,
     cosinef32_and_celltypei8,
@@ -53,31 +53,27 @@ class LazyKDE:
     of data in memory.
     """
 
-    def __init__(
-        self,
-        counts: GridCounts,
-        *,
-        n_threads: int | None = None,
-    ):
+    @validate_threads
+    def __init__(self, counts: GridCounts, *, n_threads: int | None = None):
         """
         Parameters
         ----------
         counts : sainsc.GridCounts
             Gene counts.
         n_threads : int, optional
-            Number of threads used for reading and processing file. If `None` this will
-            default to the number of available CPUs.
+            Number of threads used for processing. If `None` or 0 this will default to
+            the number of available CPUs.
         """
-        if n_threads is None:
-            n_threads = _get_n_cpus()
 
         self.counts: GridCounts = counts
         """
         sainsc.GridCounts :  Spatial gene counts.
         """
 
+        # n_threads is validated (decorator) and will be int
+        # but this can currently not be reflected in the type checker
+        assert isinstance(n_threads, int)
         self.counts.n_threads = n_threads
-
         self._threads = n_threads
 
         self._kernel: NDArray[np.float32] | None = None
@@ -91,6 +87,7 @@ class LazyKDE:
         self._celltypes: list[str] | None = None
 
     @classmethod
+    @validate_threads
     def from_dataframe(
         cls, df: pl.DataFrame | pd.DataFrame, *, n_threads: int | None = None, **kwargs
     ) -> Self:
@@ -105,8 +102,8 @@ class LazyKDE:
         ----------
         df : polars.DataFrame | pandas.DataFrame
         n_threads : int, optional
-            Number of threads used for reading and processing file. If `None` this will
-            default to the number of available CPUs.
+            Number of threads used for processing. If `None` or 0 this will default to
+            the number of available CPUs.
         kwargs
             Other keyword arguments are passed to
             :py:meth:`sainsc.GridCounts.from_dataframe`.
@@ -1119,18 +1116,15 @@ class LazyKDE:
 
         Raises
         ------
-            TypeError
-                If setting with a type other than `int` or less than 0.
+            ValueError
+                If setting with an `int` less than 0.
         """
         return self._threads
 
     @n_threads.setter
-    def n_threads(self, n_threads: int):
-        if isinstance(n_threads, int) and n_threads >= 0:
-            self._threads = n_threads if n_threads > 0 else _get_n_cpus()
-            self.counts.n_threads = self._threads
-        else:
-            raise TypeError("`n_threads` must be an `int` >= 0.")
+    def n_threads(self, n_threads: int | None):
+        self._threads = _validate_n_threads(n_threads)
+        self.counts.n_threads = self._threads
 
     @property
     def shape(self) -> tuple[int, int]:
