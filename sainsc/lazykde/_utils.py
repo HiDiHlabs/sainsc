@@ -15,7 +15,8 @@ from .._utils_rust import GridCounts
 T = TypeVar("T", bound=np.number)
 U = TypeVar("U", bound=np.bool_ | np.integer)
 
-_SCALEBAR = {"box_alpha": 0, "color": "w"}
+SCALEBAR_PARAMS = dict(box_alpha=0, color="w")
+"""Default scalebar parameters"""
 
 
 @njit

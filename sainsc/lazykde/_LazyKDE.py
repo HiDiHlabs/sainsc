@@ -30,7 +30,7 @@ from .._utils_rust import (
 )
 from ._kernel import gaussian_kernel
 from ._utils import (
-    _SCALEBAR,
+    SCALEBAR_PARAMS,
     CosineCelltypeCallable,
     _apply_color,
     _filter_blobs,
@@ -621,7 +621,7 @@ class LazyKDE:
         crop: _RangeTuple2D | None = None,
         scalebar: bool = True,
         im_kwargs: dict = dict(),
-        scalebar_kwargs: dict = _SCALEBAR,
+        scalebar_kwargs: dict = SCALEBAR_PARAMS,
     ) -> Figure:
         if remove_background:
             if self.background is not None:
@@ -741,7 +741,7 @@ class LazyKDE:
         crop: _RangeTuple2D | None = None,
         scalebar: bool = True,
         im_kwargs: dict = dict(),
-        scalebar_kwargs: dict = _SCALEBAR,
+        scalebar_kwargs: dict = SCALEBAR_PARAMS,
     ) -> Figure:
         """
         Plot the gene expression counts.
@@ -800,7 +800,7 @@ class LazyKDE:
         crop: _RangeTuple2D | None = None,
         scalebar: bool = True,
         im_kwargs: dict = dict(),
-        scalebar_kwargs: dict = _SCALEBAR,
+        scalebar_kwargs: dict = SCALEBAR_PARAMS,
     ) -> Figure:
         """
         Plot the kernel density estimate (KDE).
@@ -913,7 +913,7 @@ class LazyKDE:
         cmap: _Cmap = "hls",
         background: str | tuple = "black",
         undefined: str | tuple = "grey",
-        scalebar_kwargs: dict = _SCALEBAR,
+        scalebar_kwargs: dict = SCALEBAR_PARAMS,
         return_img: bool = False,
     ) -> Figure | NDArray[np.uint8]:
         """
@@ -1023,7 +1023,7 @@ class LazyKDE:
         crop: _RangeTuple2D | None = None,
         scalebar: bool = True,
         im_kwargs: dict = dict(),
-        scalebar_kwargs: dict = _SCALEBAR,
+        scalebar_kwargs: dict = SCALEBAR_PARAMS,
     ) -> Figure:
         """
         Plot the cosine similarity from cell-type assignment.
@@ -1070,7 +1070,7 @@ class LazyKDE:
         crop: _RangeTuple2D | None = None,
         scalebar: bool = True,
         im_kwargs: dict = dict(),
-        scalebar_kwargs: dict = _SCALEBAR,
+        scalebar_kwargs: dict = SCALEBAR_PARAMS,
     ) -> Figure:
         """
         Plot the assignment score from cell-type assignment.
