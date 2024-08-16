@@ -1,3 +1,7 @@
+"""
+This module contains functionality for performing the various analysis steps of sainsc.
+"""
+
 from ._kernel import epanechnikov_kernel, gaussian_kernel
 from ._LazyKDE import LazyKDE
 from ._utils import SCALEBAR_PARAMS
