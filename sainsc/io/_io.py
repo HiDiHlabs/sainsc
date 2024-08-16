@@ -42,6 +42,18 @@ _GEM_SCHEMA_OVERRIDE = {
 
 
 def read_gem_header(filepath: _PathLike) -> dict[str, str]:
+    """
+    Read the metadata from the top of the GEM file.
+
+    Parameters
+    ----------
+    filepath : os.PathLike or str
+        Path to the GEM file.
+
+    Returns
+    -------
+    dict[str, str]
+    """
     header = dict()
     with _open_file(filepath, "rb") as f:
         for line in f:
