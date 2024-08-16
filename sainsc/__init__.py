@@ -8,13 +8,6 @@ except PackageNotFoundError:
 del PackageNotFoundError, version
 
 from ._utils_rust import GridCounts
-from .io import read_StereoSeq, read_StereoSeq_bins
-from .lazykde import LazyKDE, gaussian_kernel
+from .lazykde import LazyKDE
 
-__all__ = [
-    "GridCounts",
-    "LazyKDE",
-    "gaussian_kernel",
-    "read_StereoSeq",
-    "read_StereoSeq_bins",
-]
+__all__ = ["GridCounts", "LazyKDE"]
