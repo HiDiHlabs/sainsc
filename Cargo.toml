@@ -22,3 +22,4 @@ pyo3          = { version = "0.21.0", features = ["extension-module"] }
 pyo3-polars   = { version = "0.15.0" }
 rayon         = { version = "1.8.0" }
 sprs          = { version = "0.11.1", features = ["serde"] }
+zarrs         = { version = "0.16.4", features = ["ndarray", "gzip"] }
