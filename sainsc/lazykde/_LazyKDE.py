@@ -1259,7 +1259,7 @@ class LazyKDE:
         """
         return self._celltype_map
 
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         repr = [
             f"LazyKDE ({self.n_threads} threads)",
             f"genes: {len(self.genes)}",

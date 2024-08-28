@@ -278,7 +278,7 @@ impl GridCounts {
         Ok(((HashMap::new(),), HashMap::new()))
     }
 
-    fn __str__(&self) -> String {
+    fn __repr__(&self) -> String {
         let mut repr = vec![
             format!("GridCounts ({} threads)", self.n_threads),
             format!("genes: {}", self.counts.len()),
