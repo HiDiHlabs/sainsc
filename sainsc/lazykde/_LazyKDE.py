@@ -29,7 +29,7 @@ from .._utils_rust import (
     kde_at_coord,
     sparse_kde_csx_py,
 )
-from ._kernel import gaussian_kernel
+from ..utils import gaussian_kernel
 from ._utils import (
     SCALEBAR_PARAMS,
     CosineCelltypeCallable,
