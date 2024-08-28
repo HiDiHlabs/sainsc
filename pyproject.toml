@@ -53,10 +53,10 @@ data = ["pooch>=1"]
 dev = ["sainsc[data,docs,spatialdata]", "pre-commit"]
 
 [project.urls]
-homepage      = "https://github.com/HiDiHlabs/sainsc"
-documentation = "https://sainsc.readthedocs.io"
-repository    = "https://github.com/HiDiHlabs/sainsc"
-
+Homepage      = "https://github.com/HiDiHlabs/sainsc"
+Documentation = "https://sainsc.readthedocs.io"
+Repository    = "https://github.com/HiDiHlabs/sainsc"
+Issues        = "https://github.com/HiDiHlabs/sainsc/issues"
 
 [tool]
 
