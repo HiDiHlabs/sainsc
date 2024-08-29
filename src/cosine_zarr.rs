@@ -1,12 +1,13 @@
 use ndarray::{Array2, Array3, NdFloat};
 use num::zero;
-use std::{error::Error, path::PathBuf, sync::Arc};
+use serde_json::Map;
+use std::{collections::BTreeMap, error::Error, path::PathBuf, sync::Arc};
 use zarrs::{
     array::{
         chunk_grid::RegularChunkGrid, codec::GzipCodec, Array as ZarrArray, ArrayBuilder,
         ChunkGrid, DataType, Element, FillValue,
     },
-    group::Group,
+    group::{Group, GroupMetadataV3},
     storage::store::FilesystemStore,
 };
 
@@ -33,12 +34,17 @@ pub fn initialize_cosine_zarrstore(
     ));
 
     // generate root
-    // Group::new_with_metadata(
-    //     store.clone(),
-    //     path.to_str().expect("Valid path"),
-    //     serde_json::json!({"shape", shape}),
-    // )?
-    Group::open(store.clone(), "/")?.store_metadata()?;
+    let mut root_meta = Map::new();
+    root_meta.insert("shape".into(), serde_json::to_value(shape.clone())?);
+    root_meta.insert("celltypes".into(), serde_json::to_value(celltypes)?);
+    root_meta.insert("chunk_size".into(), serde_json::to_value(chunk_size)?);
+
+    Group::new_with_metadata(
+        store.clone(),
+        "/",
+        GroupMetadataV3::new(root_meta, BTreeMap::new()).into(),
+    )?
+    .store_metadata()?;
 
     // generate cosine group
     Group::open(store.clone(), CT_PATH_PREFIX)?.store_metadata()?;
