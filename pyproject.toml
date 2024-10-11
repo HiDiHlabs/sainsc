@@ -25,6 +25,7 @@ dependencies = [
     "scikit-image>=0.18",
     "scipy>=1.9",
     "seaborn>=0.11",
+    "typing-extensions>=4",
 ]
 classifiers = [
     "Intended Audience :: Science/Research",
@@ -52,10 +53,10 @@ data = ["pooch>=1"]
 dev = ["sainsc[data,docs,spatialdata]", "pre-commit"]
 
 [project.urls]
-homepage      = "https://github.com/HiDiHlabs/sainsc"
-documentation = "https://sainsc.readthedocs.io"
-repository    = "https://github.com/HiDiHlabs/sainsc"
-
+Homepage      = "https://github.com/HiDiHlabs/sainsc"
+Documentation = "https://sainsc.readthedocs.io"
+Repository    = "https://github.com/HiDiHlabs/sainsc"
+Issues        = "https://github.com/HiDiHlabs/sainsc/issues"
 
 [tool]
 
@@ -78,6 +79,9 @@ target-version = ["py310", "py311", "py312"]
 
 [tool.ruff]
 target-version = "py310"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402"]
 
 [tool.mypy]
 python_version         = "3.10"

@@ -51,7 +51,7 @@ macro_rules! build_cos_ct_fn {
                 counts.shape,
                 log,
                 chunk_size,
-                n_threads.unwrap_or(0),
+                n_threads
             );
 
             match cos_ct {
@@ -76,7 +76,7 @@ fn chunk_and_calculate_cosine<C, I, F, U>(
     shape: (usize, usize),
     log: bool,
     chunk_size: (usize, usize),
-    n_threads: usize,
+    n_threads: Option<usize>,
 ) -> Result<(Array2<F>, Array2<F>, Array2<U>), Box<dyn Error>>
 where
     C: NumCast + Copy + Sync + Send + Default,

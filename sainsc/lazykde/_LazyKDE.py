@@ -18,9 +18,10 @@ from numba import njit
 from numpy.typing import NDArray
 from scipy.sparse import coo_array, csc_array, csr_array
 from skimage.feature import peak_local_max
+from typing_extensions import Self
 
 from .._typealias import _Cmap, _Csx, _CsxArray, _Local_Max, _RangeTuple2D
-from .._utils import _get_n_cpus, _raise_module_load_error
+from .._utils import _raise_module_load_error, _validate_n_threads, validate_threads
 from .._utils_rust import (
     GridCounts,
     cosinef32_and_celltypei8,
@@ -28,9 +29,9 @@ from .._utils_rust import (
     kde_at_coord,
     sparse_kde_csx_py,
 )
-from ._kernel import gaussian_kernel
+from ..utils import gaussian_kernel
 from ._utils import (
-    _SCALEBAR,
+    SCALEBAR_PARAMS,
     CosineCelltypeCallable,
     _apply_color,
     _filter_blobs,
@@ -52,31 +53,27 @@ class LazyKDE:
     of data in memory.
     """
 
-    def __init__(
-        self,
-        counts: GridCounts,
-        *,
-        n_threads: int | None = None,
-    ):
+    @validate_threads
+    def __init__(self, counts: GridCounts, *, n_threads: int | None = None):
         """
         Parameters
         ----------
         counts : sainsc.GridCounts
             Gene counts.
         n_threads : int, optional
-            Number of threads used for reading and processing file. If `None` this will
-            default to the number of available CPUs.
+            Number of threads used for processing. If `None` or 0 this will default to
+            the number of available CPUs.
         """
-        if n_threads is None:
-            n_threads = _get_n_cpus()
 
         self.counts: GridCounts = counts
         """
         sainsc.GridCounts :  Spatial gene counts.
         """
 
+        # n_threads is validated (decorator) and will be int
+        # but this can currently not be reflected in the type checker
+        assert isinstance(n_threads, int)
         self.counts.n_threads = n_threads
-
         self._threads = n_threads
 
         self._kernel: NDArray[np.float32] | None = None
@@ -90,9 +87,10 @@ class LazyKDE:
         self._celltypes: list[str] | None = None
 
     @classmethod
+    @validate_threads
     def from_dataframe(
         cls, df: pl.DataFrame | pd.DataFrame, *, n_threads: int | None = None, **kwargs
-    ):
+    ) -> Self:
         """
         Construct a LazyKDE from a DataFrame.
 
@@ -104,8 +102,8 @@ class LazyKDE:
         ----------
         df : polars.DataFrame | pandas.DataFrame
         n_threads : int, optional
-            Number of threads used for reading and processing file. If `None` this will
-            default to the number of available CPUs.
+            Number of threads used for processing. If `None` or 0 this will default to
+            the number of available CPUs.
         kwargs
             Other keyword arguments are passed to
             :py:meth:`sainsc.GridCounts.from_dataframe`.
@@ -317,10 +315,7 @@ class LazyKDE:
         if self.local_maxima is None:
             raise ValueError("`local_maxima` have to be identified before loading")
 
-        if genes is None:
-            genes = self.genes
-        else:
-            genes = list(genes)
+        genes = self.genes if genes is None else list(genes)
 
         kde = self._load_KDE_maxima(genes)
         adata = _localmax_anndata(
@@ -624,7 +619,7 @@ class LazyKDE:
         crop: _RangeTuple2D | None = None,
         scalebar: bool = True,
         im_kwargs: dict = dict(),
-        scalebar_kwargs: dict = _SCALEBAR,
+        scalebar_kwargs: dict = SCALEBAR_PARAMS,
     ) -> Figure:
         if remove_background:
             if self.background is not None:
@@ -744,7 +739,7 @@ class LazyKDE:
         crop: _RangeTuple2D | None = None,
         scalebar: bool = True,
         im_kwargs: dict = dict(),
-        scalebar_kwargs: dict = _SCALEBAR,
+        scalebar_kwargs: dict = SCALEBAR_PARAMS,
     ) -> Figure:
         """
         Plot the gene expression counts.
@@ -803,7 +798,7 @@ class LazyKDE:
         crop: _RangeTuple2D | None = None,
         scalebar: bool = True,
         im_kwargs: dict = dict(),
-        scalebar_kwargs: dict = _SCALEBAR,
+        scalebar_kwargs: dict = SCALEBAR_PARAMS,
     ) -> Figure:
         """
         Plot the kernel density estimate (KDE).
@@ -916,7 +911,7 @@ class LazyKDE:
         cmap: _Cmap = "hls",
         background: str | tuple = "black",
         undefined: str | tuple = "grey",
-        scalebar_kwargs: dict = _SCALEBAR,
+        scalebar_kwargs: dict = SCALEBAR_PARAMS,
         return_img: bool = False,
     ) -> Figure | NDArray[np.uint8]:
         """
@@ -1026,7 +1021,7 @@ class LazyKDE:
         crop: _RangeTuple2D | None = None,
         scalebar: bool = True,
         im_kwargs: dict = dict(),
-        scalebar_kwargs: dict = _SCALEBAR,
+        scalebar_kwargs: dict = SCALEBAR_PARAMS,
     ) -> Figure:
         """
         Plot the cosine similarity from cell-type assignment.
@@ -1054,19 +1049,17 @@ class LazyKDE:
         :py:meth:`sainsc.LazyKDE.assign_celltype`
         """
         if self.cosine_similarity is not None:
-            img = self.cosine_similarity
+            return self._plot_2d(
+                self.cosine_similarity,
+                "Cosine similarity",
+                remove_background=remove_background,
+                crop=crop,
+                scalebar=scalebar,
+                im_kwargs=im_kwargs,
+                scalebar_kwargs=scalebar_kwargs,
+            )
         else:
             raise ValueError("Cell types have not been assigned")
-
-        return self._plot_2d(
-            img,
-            "Cosine similarity",
-            remove_background=remove_background,
-            crop=crop,
-            scalebar=scalebar,
-            im_kwargs=im_kwargs,
-            scalebar_kwargs=scalebar_kwargs,
-        )
 
     def plot_assignment_score(
         self,
@@ -1075,7 +1068,7 @@ class LazyKDE:
         crop: _RangeTuple2D | None = None,
         scalebar: bool = True,
         im_kwargs: dict = dict(),
-        scalebar_kwargs: dict = _SCALEBAR,
+        scalebar_kwargs: dict = SCALEBAR_PARAMS,
     ) -> Figure:
         """
         Plot the assignment score from cell-type assignment.
@@ -1103,19 +1096,17 @@ class LazyKDE:
         :py:meth:`sainsc.LazyKDE.assign_celltype`
         """
         if self.assignment_score is not None:
-            img = self.assignment_score
+            return self._plot_2d(
+                self.assignment_score,
+                "Assignment score",
+                remove_background=remove_background,
+                crop=crop,
+                scalebar=scalebar,
+                im_kwargs=im_kwargs,
+                scalebar_kwargs=scalebar_kwargs,
+            )
         else:
             raise ValueError("Cell types have not been assigned")
-
-        return self._plot_2d(
-            img,
-            "Assignment score",
-            remove_background=remove_background,
-            crop=crop,
-            scalebar=scalebar,
-            im_kwargs=im_kwargs,
-            scalebar_kwargs=scalebar_kwargs,
-        )
 
     ## Attributes
     @property
@@ -1125,20 +1116,15 @@ class LazyKDE:
 
         Raises
         ------
-            TypeError
-                If setting with a type other than `int` or less than 0.
+            ValueError
+                If setting with an `int` less than 0.
         """
         return self._threads
 
     @n_threads.setter
-    def n_threads(self, n_threads: int):
-        if isinstance(n_threads, int) and n_threads >= 0:
-            if n_threads == 0:
-                n_threads = _get_n_cpus()
-            self._threads = n_threads
-            self.counts.n_threads = n_threads
-        else:
-            raise TypeError("`n_threads` must be an `int` >= 0.")
+    def n_threads(self, n_threads: int | None):
+        self._threads = _validate_n_threads(n_threads)
+        self.counts.n_threads = self._threads
 
     @property
     def shape(self) -> tuple[int, int]:
@@ -1167,7 +1153,7 @@ class LazyKDE:
         return self.counts.resolution
 
     @resolution.setter
-    def resolution(self, resolution: float):
+    def resolution(self, resolution: float | None):
         self.counts.resolution = resolution
 
     @property
@@ -1273,14 +1259,14 @@ class LazyKDE:
         """
         return self._celltype_map
 
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         repr = [
             f"LazyKDE ({self.n_threads} threads)",
             f"genes: {len(self.genes)}",
             f"shape: {self.shape}",
         ]
         if self.resolution is not None:
-            repr.append(f"resolution: {self.resolution} nm / px")
+            repr.append(f"resolution: {self.resolution:.1f} nm / px")
         if self.kernel is not None:
             repr.append(f"kernel: {self.kernel.shape}")
         if self.background is not None:
