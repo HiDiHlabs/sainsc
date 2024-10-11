@@ -5,14 +5,10 @@ try:
 except PackageNotFoundError:
     __version__ = "unknown version"
 
-from ._utils_rust import GridCounts
-from .io import read_StereoSeq, read_StereoSeq_bins
-from .lazykde import LazyKDE, gaussian_kernel
+del PackageNotFoundError, version
 
-__all__ = [
-    "GridCounts",
-    "LazyKDE",
-    "gaussian_kernel",
-    "read_StereoSeq",
-    "read_StereoSeq_bins",
-]
+from . import io, lazykde, utils
+from ._utils_rust import GridCounts
+from .lazykde import LazyKDE
+
+__all__ = ["io", "lazykde", "utils", "GridCounts", "LazyKDE"]

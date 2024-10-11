@@ -1,5 +1,6 @@
+import functools
 import os
-from typing import NoReturn
+from typing import Callable, NoReturn, ParamSpec, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -9,7 +10,32 @@ from ._utils_rust import coordinate_as_string
 
 
 def _get_n_cpus() -> int:
-    return len(os.sched_getaffinity(0))
+    available_cpus = len(os.sched_getaffinity(0))
+    return min(available_cpus, 32)
+
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+
+def _validate_n_threads(n_threads: int | None) -> int:
+    if n_threads is None:
+        n_threads = 0
+    if n_threads < 0:
+        raise ValueError("`n_threads` must be >= 0.")
+    else:
+        return n_threads if n_threads > 0 else _get_n_cpus()
+
+
+def validate_threads(func: Callable[P, T]) -> Callable[P, T]:
+    @functools.wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+        n_threads = kwargs.get("n_threads", 0)
+        assert n_threads is None or isinstance(n_threads, int)
+        kwargs["n_threads"] = _validate_n_threads(n_threads)
+        return func(*args, **kwargs)
+
+    return wrapper
 
 
 def _get_coordinate_index(
@@ -17,7 +43,7 @@ def _get_coordinate_index(
     y: NDArray[np.integer],
     *,
     name: str | None = None,
-    n_threads: int = 1,
+    n_threads: int | None = None,
 ) -> pd.Index:
     x_i32: NDArray[np.int32] = x.astype(np.int32, copy=False)
     y_i32: NDArray[np.int32] = y.astype(np.int32, copy=False)
@@ -25,18 +51,6 @@ def _get_coordinate_index(
     return pd.Index(
         coordinate_as_string(x_i32, y_i32, n_threads=n_threads), dtype=str, name=name
     )
-
-
-def _bin_coordinates(df: pd.DataFrame, bin_size: float) -> pd.DataFrame:
-    df = df.assign(
-        x=lambda df: _get_bin_coordinate(df["x"].to_numpy(), bin_size),
-        y=lambda df: _get_bin_coordinate(df["y"].to_numpy(), bin_size),
-    )
-    return df
-
-
-def _get_bin_coordinate(coor: NDArray[np.number], bin_size: float) -> NDArray[np.int32]:
-    return np.floor(coor / bin_size).astype(np.int32, copy=False)
 
 
 def _raise_module_load_error(e: Exception, fn: str, pkg: str, extra: str) -> NoReturn:
