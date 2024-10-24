@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Self
 
 import numpy as np
@@ -42,10 +43,12 @@ def coordinate_as_string(
 def cosinef32_and_celltypei8(
     counts: GridCounts,
     genes: list[str],
+    celltypes: list[str],
     signatures: NDArray[np.float32],
     kernel: NDArray[np.float32],
     *,
     log: bool = False,
+    zarr_path: Path | None = None,
     chunk_size: tuple[int, int] = (500, 500),
     n_threads: int | None = None,
 ) -> tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.int8]]:
@@ -57,10 +60,12 @@ def cosinef32_and_celltypei8(
 def cosinef32_and_celltypei16(
     counts: GridCounts,
     genes: list[str],
+    celltypes: list[str],
     signatures: NDArray[np.float32],
     kernel: NDArray[np.float32],
     *,
     log: bool = False,
+    zarr_path: Path | None = None,
     chunk_size: tuple[int, int] = (500, 500),
     n_threads: int | None = None,
 ) -> tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.int16]]:

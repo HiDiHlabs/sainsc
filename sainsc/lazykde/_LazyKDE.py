@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from itertools import chain
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Self
 
 import matplotlib.pyplot as plt
@@ -19,7 +20,7 @@ from numpy.typing import NDArray
 from scipy.sparse import coo_array, csc_array, csr_array
 from skimage.feature import peak_local_max
 
-from .._typealias import _Cmap, _Csx, _CsxArray, _Local_Max, _RangeTuple2D
+from .._typealias import _Cmap, _Csx, _CsxArray, _Local_Max, _PathLike, _RangeTuple2D
 from .._utils import _raise_module_load_error, _validate_n_threads, validate_threads
 from .._utils_rust import (
     GridCounts,
@@ -542,6 +543,7 @@ class LazyKDE:
         signatures: pd.DataFrame,
         *,
         log: bool = False,
+        zarr_path: _PathLike | None = None,
         chunk: tuple[int, int] = (500, 500),
     ):
         """
@@ -557,6 +559,9 @@ class LazyKDE:
         log : bool
             Whether to log transform the KDE when calculating the cosine similarity.
             This is useful if the gene signatures are derived from log-transformed data.
+        zarr_path : os.PathLike, str, or None
+            If not `None` the cosine similarities for all cell types will be written to
+            the specified path as zarr storage.
         chunk : tuple[int, int]
             Size of the chunks for processing. Larger chunks require more memory but
             have less duplicated computation.
@@ -569,7 +574,12 @@ class LazyKDE:
             If `self.kernel` is not set.
         ValueError
             If `chunk` is smaller than the shape of `self.kernel`.
+        ValueError
+            If `zarr_path` is not None and the celltype names contain
+            illegal characters for file names.
         """
+
+        ILLEGAL_CHARS = ["/", "\\"]
 
         if not all(signatures.index.isin(self.genes)):
             raise ValueError(
@@ -587,6 +597,16 @@ class LazyKDE:
         celltypes = signatures.columns.tolist()
         ct_dtype = _get_cell_dtype(len(celltypes))
 
+        zarr_path = None if zarr_path is None else Path(zarr_path)
+
+        if zarr_path is not None and any(
+            char in ct for char in ILLEGAL_CHARS for ct in celltypes
+        ):
+            raise ValueError(
+                "Celltype names contain at least one of the illegal characters: "
+                f"{ILLEGAL_CHARS}"
+            )
+
         # scale signatures to unit norm
         signatures_mat = signatures.to_numpy()
         signatures_mat = (
@@ -600,9 +620,11 @@ class LazyKDE:
         self._cosine_similarity, self._assignment_score, self._celltype_map = fn(
             self.counts,
             genes,
+            celltypes,
             signatures_mat,
             self.kernel,
             log=log,
+            zarr_path=zarr_path,
             chunk_size=chunk,
             n_threads=self.n_threads,
         )
