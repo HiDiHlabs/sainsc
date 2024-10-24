@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 from itertools import chain
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,7 +18,6 @@ from numba import njit
 from numpy.typing import NDArray
 from scipy.sparse import coo_array, csc_array, csr_array
 from skimage.feature import peak_local_max
-from typing_extensions import Self
 
 from .._typealias import _Cmap, _Csx, _CsxArray, _Local_Max, _RangeTuple2D
 from .._utils import _raise_module_load_error, _validate_n_threads, validate_threads
