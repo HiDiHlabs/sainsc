@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 from itertools import chain
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,7 +19,6 @@ from numba import njit
 from numpy.typing import NDArray
 from scipy.sparse import coo_array, csc_array, csr_array
 from skimage.feature import peak_local_max
-from typing_extensions import Self
 
 from .._typealias import _Cmap, _Csx, _CsxArray, _Local_Max, _PathLike, _RangeTuple2D
 from .._utils import _raise_module_load_error, _validate_n_threads, validate_threads
@@ -30,7 +29,7 @@ from .._utils_rust import (
     kde_at_coord,
     sparse_kde_csx_py,
 )
-from ._kernel import gaussian_kernel
+from ..utils import gaussian_kernel
 from ._utils import (
     SCALEBAR_PARAMS,
     CosineCelltypeCallable,
@@ -1281,7 +1280,7 @@ class LazyKDE:
         """
         return self._celltype_map
 
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         repr = [
             f"LazyKDE ({self.n_threads} threads)",
             f"genes: {len(self.genes)}",

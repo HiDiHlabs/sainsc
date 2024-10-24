@@ -232,7 +232,6 @@ def read_Xenium(
         :py:attr:`sainsc.io.XENIUM_CTRLS` by default.
         For Xenium v3 parquet files the data is automatically filtered with the
         'is_gene' column, as well.
-    column.
     n_threads : int | None, optional
         Number of threads used for reading file and processing. If `None` or 0 this will
         default to the number of available CPUs.

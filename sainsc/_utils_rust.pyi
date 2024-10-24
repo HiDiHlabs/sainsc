@@ -1,9 +1,9 @@
 from pathlib import Path
+from typing import Self
 
 import numpy as np
 from numpy.typing import NDArray
 from polars import DataFrame
-from typing_extensions import Self
 
 from ._typealias import _Csx, _CsxArray
 

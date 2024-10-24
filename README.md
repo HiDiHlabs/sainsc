@@ -34,7 +34,7 @@ conda install bioconda::sainsc
 ```
 
 For detailed installation instructions please refer to the
-[documentation](https://sainsc.readthedocs.io/en/stable/installation.html).
+[documentation](https://sainsc.readthedocs.io/page/installation.html).
 
 ## Documentation
 

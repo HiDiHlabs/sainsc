@@ -8,7 +8,7 @@ name            = "sainsc"
 description     = "Segmentation-free Analysis of In Situ Capture data"
 readme          = { file = "README.md", content-type = "text/markdown" }
 license         = { file = "LICENSE" }
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dynamic         = ["version"]
 
 authors = [
@@ -16,16 +16,15 @@ authors = [
 ]
 dependencies = [
     "anndata>=0.9",
-    "matplotlib",
+    "matplotlib>=3.7",
     "matplotlib-scalebar",
     "numba>=0.44",
-    "numpy>=1.21",
-    "pandas",
+    "numpy>=1.24",
+    "pandas>=2.0",
     "polars[pandas]>=1",
-    "scikit-image>=0.18",
-    "scipy>=1.9",
+    "scikit-image>=0.20",
+    "scipy>=1.10",
     "seaborn>=0.11",
-    "typing-extensions>=4",
 ]
 classifiers = [
     "Intended Audience :: Science/Research",
@@ -53,10 +52,10 @@ data = ["pooch>=1"]
 dev = ["sainsc[data,docs,spatialdata]", "pre-commit"]
 
 [project.urls]
-homepage      = "https://github.com/HiDiHlabs/sainsc"
-documentation = "https://sainsc.readthedocs.io"
-repository    = "https://github.com/HiDiHlabs/sainsc"
-
+Homepage      = "https://github.com/HiDiHlabs/sainsc"
+Documentation = "https://sainsc.readthedocs.io"
+Repository    = "https://github.com/HiDiHlabs/sainsc"
+Issues        = "https://github.com/HiDiHlabs/sainsc/issues"
 
 [tool]
 
@@ -75,16 +74,16 @@ target = "sainsc._utils_rust"
 profile = "black"
 
 [tool.black]
-target-version = ["py310", "py311", "py312"]
+target-version = ["py311", "py312", "py313"]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["E402"]
 
 [tool.mypy]
-python_version         = "3.10"
+python_version         = "3.11"
 ignore_missing_imports = true
 warn_no_return         = false
 packages               = "sainsc"
