@@ -4,8 +4,8 @@ use serde_json::Map;
 use std::{collections::BTreeMap, error::Error, path::PathBuf, sync::Arc};
 use zarrs::{
     array::{codec::GzipCodec, Array as ZarrArray, ArrayBuilder, DataType, Element, FillValue},
+    filesystem::FilesystemStore,
     group::{Group, GroupBuilder, GroupMetadataV3},
-    storage::store::FilesystemStore,
 };
 
 const CT_PATH_PREFIX: &str = "/cosine";
@@ -53,7 +53,7 @@ pub fn initialize_cosine_zarrstore(
         FillValue::from(0),
     );
     array_builder
-        .bytes_to_bytes_codecs(vec![Box::new(GzipCodec::new(5)?)])
+        .bytes_to_bytes_codecs(vec![Arc::new(GzipCodec::new(5)?)])
         .dimension_names(["x", "y"].into());
 
     // generate empty arrays for celltypes
