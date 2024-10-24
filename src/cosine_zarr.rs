@@ -22,6 +22,7 @@ pub fn initialize_cosine_zarrstore(
     celltypes: &[String],
     shape: (usize, usize),
     chunk_size: (usize, usize),
+    n_chunks: (usize, usize),
 ) -> Result<Arc<FilesystemStore>, Box<dyn Error + Send + Sync>> {
     let store = Arc::new(FilesystemStore::new(path)?);
 
@@ -33,6 +34,7 @@ pub fn initialize_cosine_zarrstore(
     root_meta.insert("shape".into(), serde_json::to_value(shape.clone())?);
     root_meta.insert("celltypes".into(), serde_json::to_value(celltypes)?);
     root_meta.insert("chunk_size".into(), serde_json::to_value(chunk_size)?);
+    root_meta.insert("n_chunks".into(), serde_json::to_value(n_chunks)?);
 
     Group::new_with_metadata(
         store.clone(),

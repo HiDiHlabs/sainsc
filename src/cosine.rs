@@ -125,7 +125,7 @@ where
 
     // init zarr store for celltypes with chunksize and all zero arrays
     let zarr_store = match zarr_path
-        .map(|path| initialize_cosine_zarrstore(path, &celltypes, shape, chunk_size))
+        .map(|path| initialize_cosine_zarrstore(path, &celltypes, shape, chunk_size, (m, n)))
     {
         Some(Err(e)) => return Err(e),
         Some(Ok(store)) => Some(store),
