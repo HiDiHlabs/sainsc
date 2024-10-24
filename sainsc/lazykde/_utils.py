@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from pathlib import Path
 from typing import Protocol, TypeVar
 
 import numpy as np
@@ -71,10 +72,12 @@ class CosineCelltypeCallable(Protocol):
         self,
         counts: GridCounts,
         genes: list[str],
+        celltypes: list[str],
         signatures: NDArray[np.float32],
         kernel: NDArray[np.float32],
         *,
         log: bool = ...,
+        zarr_path: Path | None = None,
         chunk_size: tuple[int, int] = ...,
         n_threads: int | None = ...,
     ) -> tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.signedinteger]]: ...
