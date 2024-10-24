@@ -4,12 +4,14 @@ from typing import Protocol, TypeVar
 
 import numpy as np
 import pandas as pd
+import zarr
 from anndata import AnnData
 from numba import njit
 from numpy.typing import NDArray
 from scipy.sparse import csr_matrix, sparray, spmatrix
 from skimage.measure import label, regionprops
 
+from .._typealias import _Local_Max, _PathLike
 from .._utils import _get_coordinate_index
 from .._utils_rust import GridCounts
 
@@ -65,6 +67,23 @@ def _localmax_anndata(
         var=pd.DataFrame(index=pd.Index(genelist, name="gene")),
         obsm={"spatial": np.column_stack(coord)},
     )
+
+
+def _load_localmax_cosine(
+    coord: _Local_Max, zarr_store: _PathLike, *, celltypes: Iterable[str] | None = None
+) -> pd.DataFrame:
+    cosine_group = zarr.open_group(store=zarr_store, mode="r", path="cosine")
+
+    celltypes = cosine_group.array_keys() if celltypes is None else celltypes
+
+    cosine_df = pd.DataFrame({"x": coord[0], "y": coord[1]})
+
+    for ct in celltypes:
+        cosine_ct = cosine_group[ct]
+        assert isinstance(cosine_ct, zarr.Array)
+        cosine_df[ct] = cosine_ct.get_coordinate_selection(coord)
+
+    return cosine_df
 
 
 class CosineCelltypeCallable(Protocol):
