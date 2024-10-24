@@ -3,11 +3,8 @@ use num::zero;
 use serde_json::Map;
 use std::{collections::BTreeMap, error::Error, path::PathBuf, sync::Arc};
 use zarrs::{
-    array::{
-        chunk_grid::RegularChunkGrid, codec::GzipCodec, Array as ZarrArray, ArrayBuilder,
-        ChunkGrid, DataType, Element, FillValue,
-    },
-    group::{Group, GroupMetadataV3},
+    array::{codec::GzipCodec, Array as ZarrArray, ArrayBuilder, DataType, Element, FillValue},
+    group::{Group, GroupBuilder, GroupMetadataV3},
     storage::store::FilesystemStore,
 };
 
@@ -29,9 +26,7 @@ pub fn initialize_cosine_zarrstore(
     let store = Arc::new(FilesystemStore::new(path)?);
 
     let shape = vec![shape.0 as u64, shape.1 as u64];
-    let chunk_grid = ChunkGrid::new(RegularChunkGrid::new(
-        vec![chunk_size.0 as u64, chunk_size.1 as u64].try_into()?,
-    ));
+    let chunk_shape = vec![chunk_size.0 as u64, chunk_size.1 as u64];
 
     // generate root
     let mut root_meta = Map::new();
@@ -47,10 +42,16 @@ pub fn initialize_cosine_zarrstore(
     .store_metadata()?;
 
     // generate cosine group
-    Group::open(store.clone(), CT_PATH_PREFIX)?.store_metadata()?;
+    GroupBuilder::new()
+        .build(store.clone(), CT_PATH_PREFIX)?
+        .store_metadata()?;
 
-    let mut array_builder =
-        ArrayBuilder::new(shape, DataType::Float32, chunk_grid, FillValue::from(0f32));
+    let mut array_builder = ArrayBuilder::new(
+        shape,
+        DataType::Float32,
+        chunk_shape.try_into()?,
+        FillValue::from(0),
+    );
     array_builder
         .bytes_to_bytes_codecs(vec![Box::new(GzipCodec::new(5)?)])
         .dimension_names(["x", "y"].into());
