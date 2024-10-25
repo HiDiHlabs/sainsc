@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Protocol, TypeVar
+from typing import Protocol, Sequence, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -70,20 +70,26 @@ def _localmax_anndata(
 
 
 def _load_localmax_cosine(
-    coord: _Local_Max, zarr_store: _PathLike, *, celltypes: Iterable[str] | None = None
-) -> pd.DataFrame:
+    coord: _Local_Max, zarr_store: _PathLike, *, celltypes: Sequence[str] | None = None
+) -> AnnData:
     cosine_group = zarr.open_group(store=zarr_store, mode="r", path="cosine")
 
-    celltypes = cosine_group.array_keys() if celltypes is None else celltypes
+    if celltypes is None:
+        celltypes = sorted(cosine_group.array_keys())
+    elif not all(ct in cosine_group.array_keys() for ct in celltypes):
+        raise ValueError("Not all `celltypes` are available.")
 
-    cosine_df = pd.DataFrame({"x": coord[0], "y": coord[1]})
+    cosine = np.column_stack(
+        [cosine_group[ct].get_coordinate_selection(coord) for ct in celltypes]
+    )
 
-    for ct in celltypes:
-        cosine_ct = cosine_group[ct]
-        assert isinstance(cosine_ct, zarr.Array)
-        cosine_df[ct] = cosine_ct.get_coordinate_selection(coord)
+    obs = pd.DataFrame(
+        {"celltype": pd.Categorical.from_codes(cosine.argmax(axis=1), celltypes)},
+        index=_get_coordinate_index(*coord, name="local_maxima", n_threads=1),
+    )
+    var = pd.DataFrame(index=celltypes)
 
-    return cosine_df
+    return AnnData(X=cosine, obs=obs, var=var, obsm={"spatial": np.column_stack(coord)})
 
 
 class CosineCelltypeCallable(Protocol):

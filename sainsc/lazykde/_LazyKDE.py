@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 from itertools import chain
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, Self, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -427,8 +427,8 @@ class LazyKDE:
         )
 
     def load_local_maxima_cosine_similarity(
-        self, zarr_path: _PathLike, *, celltypes: Iterable[str] | None = None
-    ) -> pd.DataFrame:
+        self, zarr_path: _PathLike, *, celltypes: Sequence[str] | None = None
+    ) -> AnnData:
         """
         Load the cosine similarity for all cell types for the local maxima.
 
@@ -439,12 +439,12 @@ class LazyKDE:
         ----------
         zarr_path : os.PathLike or str
             Path to the zarr store.
-        celltypes : Iterable[str] | None, optional
+        celltypes : Sequence[str] | None, optional
             If not `None` will only load the provided cell types.
 
         Returns
         -------
-        pandas.DataFrame
+        anndata.AnnData
         """
         assert self.local_maxima is not None
         return _load_localmax_cosine(self.local_maxima, zarr_path, celltypes=celltypes)
