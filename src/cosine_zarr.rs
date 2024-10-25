@@ -78,18 +78,24 @@ pub fn write_cosine_to_zarr<T: NdFloat + Element>(
     celltypes: &[String],
     chunk_idx: &[u64],
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    // let ct_group = Group::open(zarr_store.clone(), CT_PATH_PREFIX)?;
+    // for store_chunk_ndarray the array must be the exact size of the chunk,
+    // however with a RegularChunkGrid even the dangling chunks (which might be smaller)
+    // have the exact same size
+    // therefore using store_chunk_subset_ndarray
 
     for (cos, ct) in cosine.outer_iter().zip(celltypes) {
         let mut cos_norm = &cos / kde_norm;
         cos_norm.mapv_inplace(|v| if v.is_nan() { zero() } else { v });
 
         ZarrArray::open(zarr_store.clone(), &format!("{CT_PATH_PREFIX}/{ct}"))?
-            .store_chunk_ndarray(chunk_idx, cos_norm)?;
+            .store_chunk_subset_ndarray(chunk_idx, &[0, 0], cos_norm)?;
     }
 
-    ZarrArray::open(zarr_store.clone(), KDE_PATH)?
-        .store_chunk_ndarray(chunk_idx, kde_norm.clone())?;
+    ZarrArray::open(zarr_store.clone(), KDE_PATH)?.store_chunk_subset_ndarray(
+        chunk_idx,
+        &[0, 0],
+        kde_norm.clone(),
+    )?;
 
     Ok(())
 }
