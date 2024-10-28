@@ -84,8 +84,7 @@ def _load_localmax_cosine(
     )
 
     obs = pd.DataFrame(
-        {"celltype": pd.Categorical.from_codes(cosine.argmax(axis=1), celltypes)},
-        index=_get_coordinate_index(*coord, name="local_maxima", n_threads=1),
+        index=_get_coordinate_index(*coord, name="local_maxima", n_threads=1)
     )
     var = pd.DataFrame(index=celltypes)
 

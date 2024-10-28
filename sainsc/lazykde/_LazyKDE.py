@@ -446,8 +446,18 @@ class LazyKDE:
         -------
         anndata.AnnData
         """
+        # Celltype assignment must have beenn run so the following attributesshoul exist
         assert self.local_maxima is not None
-        return _load_localmax_cosine(self.local_maxima, zarr_path, celltypes=celltypes)
+        assert self.celltypes is not None
+        assert self.celltype_map is not None
+        assert self.assignment_score is not None
+
+        adata = _load_localmax_cosine(self.local_maxima, zarr_path, celltypes=celltypes)
+        adata.obs["celltype"] = pd.Categorical.from_codes(
+            self.celltype_map[self.local_maxima], self.celltypes
+        )
+        adata.obs["assignment_score"] = self.assignment_score[self.local_maxima]
+        return adata
 
     ## Celltyping
     def filter_background(
