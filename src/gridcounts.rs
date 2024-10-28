@@ -10,6 +10,7 @@ use polars::{
         CategoricalOrdering::Physical,
         DataType::{Categorical, Int32, UInt32},
     },
+    frame::column::ScalarColumn,
     prelude::*,
 };
 use polars_arrow::array::{DictionaryArray, UInt32Array, Utf8Array};
@@ -137,7 +138,7 @@ impl GridCounts {
                 F: Fn(&Series) -> Result<&ChunkedArray<T>, PolarsError>,
                 T: PolarsNumericType,
             {
-                Ok(f(df.column(col)?)?
+                Ok(f(df.column(col)?.as_materialized_series())?
                     .to_vec_null_aware()
                     .expect_left(&format!("{col} should have no null")))
             }
@@ -151,12 +152,14 @@ impl GridCounts {
             // cast to correct dtypes and shift (i.e. subtract min)
             for col in ["x", "y"] {
                 let s = df.column(col)?.strict_cast(&Int32)?;
-                df.with_column(&s - s.min::<i32>()?.expect("non-null"))?;
+                df.with_column(&s - s.as_materialized_series().min::<i32>()?.expect("non-null"))?;
             }
 
             match df.column("count") {
                 // if counts does not exist use all 1s
-                Err(_) => df.with_column(Series::new("count", vec![1u32; df.height()]))?,
+                Err(_) => {
+                    df.with_column(ScalarColumn::new("count".into(), 1u32.into(), df.height()))?
+                }
                 Ok(s) => df.with_column(s.strict_cast(&UInt32)?)?,
             };
 
@@ -167,9 +170,18 @@ impl GridCounts {
                 )?;
             }
 
+            // coordinates shouldn't be ScalarColumn therefore using as_materialized_series
             let shape = (
-                df.column("x")?.max::<usize>()?.expect("non-null") + 1,
-                df.column("y")?.max::<usize>()?.expect("non-null") + 1,
+                df.column("x")?
+                    .as_materialized_series()
+                    .max::<usize>()?
+                    .expect("non-null")
+                    + 1,
+                df.column("y")?
+                    .as_materialized_series()
+                    .max::<usize>()?
+                    .expect("non-null")
+                    + 1,
             );
 
             let counts_dict = df
@@ -452,12 +464,12 @@ impl GridCounts {
             })
             .multiunzip();
 
-        let counts = Series::from_iter(counts).with_name("count");
-        let x = Series::from_vec("x", x);
-        let y = Series::from_vec("y", y);
+        let counts = Column::new("count".into(), Series::from_iter(counts));
+        let x = Column::new("x".into(), x);
+        let y = Column::new("y".into(), y);
         // construct categorical gene array from codes and categories
         let genes = Series::from_arrow(
-            "gene",
+            "gene".into(),
             Box::new(
                 DictionaryArray::try_from_keys(
                     UInt32Array::from_vec(gene_idx),
@@ -466,7 +478,8 @@ impl GridCounts {
                 .map_err(PyPolarsErr::from)?,
             ),
         )
-        .map_err(PyPolarsErr::from)?;
+        .map_err(PyPolarsErr::from)?
+        .into_column();
 
         let df = DataFrame::new(vec![genes, x, y, counts]).map_err(PyPolarsErr::from)?;
 
