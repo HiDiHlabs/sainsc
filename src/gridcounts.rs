@@ -254,19 +254,24 @@ impl GridCounts {
     }
 
     fn __setstate__(&mut self, state: Bound<'_, PyBytes>) -> PyResult<()> {
-        let (counts, shape, resolution, n_threads) = deserialize(state.as_bytes()).unwrap();
-        self.counts = counts;
-        self.shape = shape;
-        self.resolution = resolution;
-        self.set_n_threads(n_threads)?;
+        match deserialize(state.as_bytes()) {
+            Ok((counts, shape, resolution, n_threads)) => {
+                self.counts = counts;
+                self.shape = shape;
+                self.resolution = resolution;
+                self.set_n_threads(Some(n_threads))?;
 
-        Ok(())
+                Ok(())
+            }
+            Err(e) => Err(PyValueError::new_err(e.to_string())),
+        }
     }
 
     fn __getstate__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
-        let to_bytes = (&self.counts, self.shape, self.resolution, self.n_threads);
-
-        Ok(PyBytes::new_bound(py, &serialize(&to_bytes).unwrap()))
+        match serialize(&(&self.counts, self.shape, self.resolution, self.n_threads)) {
+            Ok(bytes) => Ok(PyBytes::new_bound(py, &bytes)),
+            Err(e) => Err(PyRuntimeError::new_err(e.to_string())),
+        }
     }
 
     fn __getnewargs_ex__(
