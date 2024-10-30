@@ -8,13 +8,14 @@ def celltype_signatures(
     adata: ad.AnnData,
     *,
     celltype_col: str = "leiden",
+    layer: str | None = None,
     agg_method: str | Callable = "mean",
 ) -> pd.DataFrame:
     """
     Calculate gene expression signatures per 'celltype'.
 
-    Note, that this will make a dense copy of `adata.X` therefore potentially leading
-    to large memory usage.
+    Note, that this will make a dense copy of `adata.X` or the selected `layer`,
+    therefore potentially leading to large memory usage.
 
     Parameters
     ----------
@@ -22,6 +23,8 @@ def celltype_signatures(
     celltype_col : str, optional
         Name of column in :py:attr:`anndata.AnnData.obs` containing cell-type
         information.
+    layer : str, optional
+        Which layer to use for aggregation. If `None`, `adata.X` is used.
     agg_method : str or collections.abc.Callable, optional
         Function to aggregate gene expression per cluster used by
         :py:meth:`pandas.DataFrame.agg`.
@@ -32,7 +35,7 @@ def celltype_signatures(
         :py:class:`pandas.DataFrame` of gene expression aggregated per 'celltype'.
     """
     signatures = (
-        adata.to_df()
+        adata.to_df(layer=layer)
         .merge(adata.obs[celltype_col], left_index=True, right_index=True)
         .groupby(celltype_col, observed=True, sort=False)
         .agg(agg_method)
