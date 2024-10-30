@@ -16,6 +16,7 @@ authors = [
 ]
 dependencies = [
     "anndata>=0.9",
+    "h5py>=3",
     "matplotlib",
     "matplotlib-scalebar",
     "numba>=0.44",
