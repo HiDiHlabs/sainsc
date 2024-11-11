@@ -251,11 +251,14 @@ def read_Xenium(
         if "is_gene" in transcripts.collect_schema().names():
             transcripts = transcripts.filter(pl.col("is_gene"))
 
-        transcripts = (
-            transcripts.select(columns)
-            .with_columns(pl.col("feature_name").cast(pl.Categorical))
-            .collect()
-        )
+        with pl.StringCache():
+            transcripts = (
+                transcripts.select(columns)
+                .with_columns(
+                    pl.col("feature_name").cast(pl.String).cast(pl.Categorical)
+                )
+                .collect()
+            )
     else:
         transcripts = pl.read_csv(
             filepath,
