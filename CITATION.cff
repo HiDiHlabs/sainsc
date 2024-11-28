@@ -3,7 +3,7 @@ message: "If you use this software, please cite the article from preferred-citat
 authors:
   - family-names: "Müller-Bötticher"
     given-names: Niklas
-	orcid: "https://orcid.org/0000-0001-5103-7282"
+    orcid: "https://orcid.org/0000-0001-5103-7282"
 title: sainsc
 date-released: "2024-07-10"
 url: "https://github.com/HiDiHlabs/sainsc"
@@ -12,16 +12,16 @@ preferred-citation:
   authors:
     - family-names: "Müller-Bötticher"
       given-names: Niklas
-	  orcid: "https://orcid.org/0000-0001-5103-7282"
+      orcid: "https://orcid.org/0000-0001-5103-7282"
     - family-names: Tiesmeyer
       given-names: Sebastian
-	  orcid: "https://orcid.org/0000-0002-0492-1523"
+      orcid: "https://orcid.org/0000-0002-0492-1523"
     - family-names: Eils
       given-names: Roland
-	  orcid: "https://orcid.org/0000-0002-0034-4036"
+      orcid: "https://orcid.org/0000-0002-0034-4036"
     - family-names: Ishaque
       given-names: Naveed
-	  orcid: "https://orcid.org/0000-0002-8426-901X"
+      orcid: "https://orcid.org/0000-0002-8426-901X"
   title: "Sainsc: A Computational Tool for Segmentation-Free Analysis of In Situ Capture Data"
   doi: 10.1002/smtd.202401123
   journal: "Small Methods"
