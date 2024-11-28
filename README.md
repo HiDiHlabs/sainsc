@@ -59,10 +59,10 @@ https://doi.org/10.1002/smtd.202401123
   title = {Sainsc: A Computational Tool for Segmentation-Free Analysis of In Situ Capture Data},
   journal = {Small Methods},
   year = {2024},
-  volume = {n/a},
-  number = {n/a},
+  volume = {},
+  number = {},
   pages = {2401123},
-  doi = {https://doi.org/10.1002/smtd.202401123},
+  doi = {10.1002/smtd.202401123},
 }
 ```
 

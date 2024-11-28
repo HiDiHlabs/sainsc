@@ -27,6 +27,6 @@ preferred-citation:
   journal: "Small Methods"
   pages: 2401123
   year: 2024
-  volume: {}
-  number: {}
+  volume: ""
+  number: ""
   publisher: "Wiley Online Library"
