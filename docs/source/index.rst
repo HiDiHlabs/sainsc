@@ -27,3 +27,4 @@ https://doi.org/10.1002/smtd.202401123
    quickstart
    installation
    usage
+   tutorials/index
