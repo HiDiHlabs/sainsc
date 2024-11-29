@@ -27,3 +27,4 @@ bioRxiv (2024) https://doi.org/10.1101/2024.08.02.603879
    quickstart
    installation
    usage
+   tutorials/index
