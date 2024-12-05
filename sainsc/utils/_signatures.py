@@ -34,7 +34,7 @@ def celltype_signatures(
         :py:class:`pandas.DataFrame` of gene expression aggregated per 'cell type'.
     """
     X = adata.X if layer is None else adata.layers[layer]
-    grouping = adata.obs.groupby(celltype_col, observed=True).indices
+    grouping = adata.obs.groupby(celltype_col, observed=True, sort=False).indices
 
     signatures: dict[Any, np.ndarray] = {}
     for name, indices in grouping.items():
