@@ -1,4 +1,4 @@
-from typing import Any
+from collections.abc import Hashable
 
 import anndata as ad
 import numpy as np
@@ -36,7 +36,7 @@ def celltype_signatures(
     X = adata.X if layer is None else adata.layers[layer]
     grouping = adata.obs.groupby(celltype_col, observed=True, sort=False).indices
 
-    signatures: dict[Any, np.ndarray] = {}
+    signatures: dict[Hashable, np.ndarray] = {}
     for name, indices in grouping.items():
         mean_X_group = X[indices].mean(axis=0, dtype=dtype)
         signatures[name] = (
