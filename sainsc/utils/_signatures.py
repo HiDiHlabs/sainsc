@@ -43,7 +43,4 @@ def celltype_signatures(
             mean_X_group.A1 if isinstance(mean_X_group, np.matrix) else mean_X_group
         )
 
-    signatures_df = pd.DataFrame(signatures, index=adata.var_names)
-    signatures_df /= signatures_df.sum(axis=0)
-
-    return signatures_df
+    return pd.DataFrame(signatures, index=adata.var_names)
