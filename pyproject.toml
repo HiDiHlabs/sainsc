@@ -101,5 +101,4 @@ skip = "pp*" # skip PyPy
 
 [tool.cibuildwheel.linux]
 # cibuildwheel runs linux in containers so we need to install rust there
-before-all  = "curl -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y"
-environment = { PATH = "$PATH:$HOME/.cargo/bin" }
+before-all = "curl -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y"
