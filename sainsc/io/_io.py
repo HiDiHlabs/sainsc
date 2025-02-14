@@ -2,11 +2,12 @@ from collections.abc import Collection
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, get_args
 
+import h5py
 import numpy as np
 import pandas as pd
 import polars as pl
 from anndata import AnnData
-from scipy.sparse import csr_matrix
+from scipy.sparse import csc_array, csr_matrix
 
 from .._typealias import _PathLike
 from .._utils import _get_coordinate_index, _raise_module_load_error, validate_threads
@@ -250,11 +251,14 @@ def read_Xenium(
         if "is_gene" in transcripts.collect_schema().names():
             transcripts = transcripts.filter(pl.col("is_gene"))
 
-        transcripts = (
-            transcripts.select(columns)
-            .with_columns(pl.col("feature_name").cast(pl.Categorical))
-            .collect()
-        )
+        with pl.StringCache():
+            transcripts = (
+                transcripts.select(columns)
+                .with_columns(
+                    pl.col("feature_name").cast(pl.String).cast(pl.Categorical)
+                )
+                .collect()
+            )
     else:
         transcripts = pl.read_csv(
             filepath,
@@ -269,6 +273,123 @@ def read_Xenium(
     return LazyKDE.from_dataframe(
         transcripts, binsize=binsize, resolution=1_000, n_threads=n_threads
     )
+
+
+# VisiumHD
+
+
+@validate_threads
+def read_VisiumHD(
+    path: _PathLike,
+    *,
+    gene_name: bool = False,
+    raw: bool = False,
+    n_threads: int | None = None,
+) -> LazyKDE:
+    """
+    Read a VisiumHD sample.
+
+    Parameters
+    ----------
+    path : os.PathLike or str
+        Path to the 2um bin directory of the sample. The filtered or raw h5 file and the
+        spatial/tissue_positions.parquet file are required.
+    gene_name : bool, optional
+        If True will use the 'name' column otherwise the 'id' column is used as gene
+        identifier.
+    raw : bool, optional
+        If `False` the filtered barcode-feature matrix will be used. If `True` the raw
+        matrix is loaded.
+    n_threads : int | None, optional
+        Number of threads used for reading file and processing. If `None` or 0 this will
+        default to the number of available CPUs.
+
+    Returns
+    -------
+    sainsc.LazyKDE
+
+    Raises
+    ------
+    FileNotFoundError
+        If either the h5-file or the barcode position file are not found at their
+        default path.
+    """
+
+    path = Path(path)
+    matrix_file = path / (
+        "raw_feature_bc_matrix.h5" if raw else "filtered_feature_bc_matrix.h5"
+    )
+    position_file = path / "spatial" / "tissue_positions.parquet"
+
+    if not matrix_file.is_file():
+        raise FileNotFoundError(f"{matrix_file} does not exist")
+    if not position_file.is_file():
+        raise FileNotFoundError(f"{position_file} does not exist")
+
+    gene_col = "name" if gene_name else "id"
+
+    barcode_position = pl.scan_parquet(position_file).rename(
+        {"array_row": "y", "array_col": "x"}
+    )
+
+    with h5py.File(matrix_file, "r") as h5file:
+        matrix_group = h5file["matrix"]
+        assert isinstance(matrix_group, h5py.Group)
+
+        barcodes = (
+            pl.LazyFrame(
+                {"barcode": matrix_group["barcodes"][:]}, schema={"barcode": pl.String}
+            )
+            .join(barcode_position, how="left", on="barcode", validate="1:1")
+            .select(["x", "y"])
+            .collect()
+        )
+
+        feature_group = matrix_group["features"]
+        features = pl.DataFrame(
+            {
+                "gene": feature_group[gene_col][:],
+                "feature_type": feature_group["feature_type"][:],
+            },
+            schema={"gene": pl.String, "feature_type": pl.String},
+        ).with_columns(pl.col("feature_type").cast(pl.Categorical))
+
+        gene_expression = csc_array(
+            (
+                matrix_group["data"][:],
+                matrix_group["indices"][:],
+                matrix_group["indptr"][:],
+            ),
+            shape=matrix_group["shape"][:],
+        )
+
+    # only keep "Gene Expression" features not "Antibody Capture"
+    keep_features = features["feature_type"] == "Gene Expression"
+    features = features.filter(keep_features)
+    gene_expression = gene_expression.tocsr()
+    gene_expression = gene_expression[keep_features, :]
+
+    gene_expression = gene_expression.tocoo()
+
+    schema = {
+        "gene": pl.Categorical,
+        "x": barcodes["x"].dtype,
+        "y": barcodes["y"].dtype,
+        "count": pl.Int32,
+    }
+
+    coordinates = barcodes[gene_expression.col]
+
+    df = pl.DataFrame(
+        {
+            "gene": features["gene"][gene_expression.row],
+            "x": coordinates["x"],
+            "y": coordinates["y"],
+            "count": gene_expression.data,
+        },
+        schema=schema,
+    )
+    return LazyKDE.from_dataframe(df, resolution=2_000, n_threads=n_threads)
 
 
 # Vizgen

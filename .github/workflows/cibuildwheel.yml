@@ -29,7 +29,10 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.21.3
+        uses: pypa/cibuildwheel@v2.22.0
+        env:
+          CIBW_ENVIRONMENT: ${{ matrix.os == 'macos-13' && 'MACOSX_DEPLOYMENT_TARGET=13.0' || '' }}
+          CIBW_ENVIRONMENT_LINUX: 'PATH=$PATH:$HOME/.cargo/bin'
 
       - uses: actions/upload-artifact@v4
         with:

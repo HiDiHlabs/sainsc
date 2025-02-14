@@ -15,9 +15,9 @@ Citations
 
 If you are using `sainsc` for your research please cite
 
-Müller-Bötticher, N., Tiesmeyer, S., Eils, R., and Ishaque, N.
-"Sainsc: a computational tool for segmentation-free analysis of in-situ capture"
-bioRxiv (2024) https://doi.org/10.1101/2024.08.02.603879
+N. Müller-Bötticher, S. Tiesmeyer, R. Eils, N. Ishaque, "Sainsc: A Computational Tool
+for Segmentation-Free Analysis of In Situ Capture Data" *Small Methods* (2024)
+https://doi.org/10.1002/smtd.202401123
 
 .. toctree::
    :maxdepth: 1
@@ -27,3 +27,4 @@ bioRxiv (2024) https://doi.org/10.1101/2024.08.02.603879
    quickstart
    installation
    usage
+   tutorials/index

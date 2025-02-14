@@ -8,7 +8,7 @@ name            = "sainsc"
 description     = "Segmentation-free Analysis of In Situ Capture data"
 readme          = { file = "README.md", content-type = "text/markdown" }
 license         = { file = "LICENSE" }
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 dynamic         = ["version"]
 
 authors = [
@@ -16,6 +16,7 @@ authors = [
 ]
 dependencies = [
     "anndata>=0.9",
+    "h5py>=3",
     "matplotlib>=3.7",
     "matplotlib-scalebar",
     "numba>=0.44",
@@ -74,7 +75,7 @@ target = "sainsc._utils_rust"
 profile = "black"
 
 [tool.black]
-target-version = ["py311", "py312", "py313"]
+target-version = ["py311", "py312"]
 
 [tool.ruff]
 target-version = "py311"
@@ -99,5 +100,4 @@ skip = "pp*" # skip PyPy
 
 [tool.cibuildwheel.linux]
 # cibuildwheel runs linux in containers so we need to install rust there
-before-all  = "curl -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y"
-environment = { PATH = "$PATH:$HOME/.cargo/bin" }
+before-all = "curl -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y"
