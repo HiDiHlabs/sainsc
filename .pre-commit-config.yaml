@@ -21,15 +21,7 @@ repos:
     rev: v0.9.6
     hooks:
       - id: ruff
-        args: [--fix]
-  - repo: https://github.com/PyCQA/isort
-    rev: 6.0.0
-    hooks:
-      - id: isort
-  - repo: https://github.com/psf/black
-    rev: 25.1.0
-    hooks:
-      - id: black
+      - id: ruff-format
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.15.0
     hooks:

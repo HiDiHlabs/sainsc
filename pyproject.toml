@@ -71,14 +71,15 @@ include = ["sainsc", "sainsc.io", "sainsc.lazykde", "sainsc.utils"]
 [[tool.setuptools-rust.ext-modules]]
 target = "sainsc._utils_rust"
 
-[tool.isort]
-profile = "black"
-
-[tool.black]
-target-version = ["py311", "py312"]
 
 [tool.ruff]
 target-version = "py311"
+
+fix        = true
+show-fixes = true
+
+[tool.ruff.lint]
+select = ["I"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["E402"]
