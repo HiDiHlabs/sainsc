@@ -79,7 +79,7 @@ fix        = true
 show-fixes = true
 
 [tool.ruff.lint]
-select = ["I"]
+extend-select = ["I"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["E402"]
