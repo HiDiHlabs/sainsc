@@ -1,7 +1,6 @@
 from collections.abc import Iterable
-from itertools import chain
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, Self, TypeVar
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,7 +14,6 @@ from matplotlib.figure import Figure
 from matplotlib.patches import Patch
 from matplotlib_scalebar.scalebar import ScaleBar
 from mpl_toolkits import axes_grid1
-from numba import njit
 from numpy.typing import NDArray
 from scipy.sparse import coo_array, csc_array, csr_array
 from skimage.feature import peak_local_max
@@ -33,7 +31,6 @@ from ..utils import gaussian_kernel
 from ._utils import (
     SCALEBAR_PARAMS,
     CosineCelltypeCallable,
-    _apply_color,
     _filter_blobs,
     _get_cell_dtype,
     _localmax_anndata,
@@ -358,7 +355,6 @@ class LazyKDE:
                 }
 
                 if self.total_mRNA_KDE is not None:
-
                     sdata_dict["total_mRNA"] = Image2DModel.parse(
                         np.atleast_3d(self.total_mRNA_KDE).T, dims=("c", "y", "x")
                     )
@@ -416,7 +412,6 @@ class LazyKDE:
             return adata
 
     def _load_KDE_maxima(self, genes: list[str]) -> csc_array | csr_array:
-
         assert self.local_maxima is not None
         if self.kernel is None:
             raise ValueError("`kernel` must be set before running KDE")
@@ -461,17 +456,13 @@ class LazyKDE:
             If cell type-specific thresholds do not include all cell types or if
             using cell type-specific thresholds before cell type assignment.
         """
+        T = TypeVar("T")
 
-        @njit
         def _map_celltype_to_value(
-            ct_map: NDArray[np.integer], thresholds: tuple[float, ...]
+            ct_map: NDArray[np.integer], thresholds: dict[T, float], classes: list[T]
         ) -> NDArray[np.floating]:
-            values = np.zeros(shape=ct_map.shape, dtype=float)
-            for i in range(ct_map.shape[0]):
-                for j in range(ct_map.shape[1]):
-                    if ct_map[i, j] >= 0:
-                        values[i, j] = thresholds[ct_map[i, j]]
-            return values
+            ordered_thresholds = np.array([0] + [thresholds[ct] for ct in classes])
+            return np.take(ordered_thresholds, ct_map + 1)
 
         if self.total_mRNA_KDE is None:
             raise ValueError(
@@ -485,8 +476,9 @@ class LazyKDE:
                 )
             elif not all([ct in min_norm.keys() for ct in self.celltypes]):
                 raise ValueError("'min_norm' does not contain all celltypes.")
-            idx2threshold = tuple(min_norm[ct] for ct in self.celltypes)
-            threshold = _map_celltype_to_value(self.celltype_map, idx2threshold)
+            threshold = _map_celltype_to_value(
+                self.celltype_map, min_norm, self.celltypes
+            )
             background = self.total_mRNA_KDE < threshold
         else:
             background = self.total_mRNA_KDE < min_norm
@@ -503,8 +495,9 @@ class LazyKDE:
                     )
                 elif not all([ct in min_cosine.keys() for ct in self.celltypes]):
                     raise ValueError("'min_cosine' does not contain all celltypes.")
-                idx2threshold = tuple(min_cosine[ct] for ct in self.celltypes)
-                threshold = _map_celltype_to_value(self.celltype_map, idx2threshold)
+                threshold = _map_celltype_to_value(
+                    self.celltype_map, min_cosine, self.celltypes
+                )
                 background |= self.cosine_similarity <= threshold
             else:
                 background |= self.cosine_similarity <= min_cosine
@@ -521,8 +514,9 @@ class LazyKDE:
                     )
                 elif not all([ct in min_assignment.keys() for ct in self.celltypes]):
                     raise ValueError("'min_assignment' does not contain all celltypes.")
-                idx2threshold = tuple(min_assignment[ct] for ct in self.celltypes)
-                threshold = _map_celltype_to_value(self.celltype_map, idx2threshold)
+                threshold = _map_celltype_to_value(
+                    self.celltype_map, min_assignment, self.celltypes
+                )
                 background |= self.assignment_score <= threshold
             else:
                 background |= self.assignment_score <= min_assignment
@@ -1006,11 +1000,11 @@ class LazyKDE:
             color_map = [to_rgb(c) if isinstance(c, str) else c for c in cmap]
 
         # convert to uint8 to reduce memory of final image
-        color_map_int = tuple(
-            (np.array(c) * 255).round().astype(np.uint8)
-            for c in chain([to_rgb(background)], color_map)
+        color_map_int = (
+            (np.array([to_rgb(background)] + color_map) * 255).round().astype(np.uint8)
         )
-        img = _apply_color(celltype_map.T, color_map_int)
+
+        img = np.take(color_map_int, celltype_map.T, axis=0)
 
         if return_img:
             return img

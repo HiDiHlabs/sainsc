@@ -5,7 +5,6 @@ from typing import Protocol, TypeVar
 import numpy as np
 import pandas as pd
 from anndata import AnnData
-from numba import njit
 from numpy.typing import NDArray
 from scipy.sparse import csr_matrix, sparray, spmatrix
 from skimage.measure import label, regionprops
@@ -18,17 +17,6 @@ U = TypeVar("U", bound=np.bool_ | np.integer)
 
 SCALEBAR_PARAMS = dict(box_alpha=0, color="w")
 """Default scalebar parameters"""
-
-
-@njit
-def _apply_color(
-    img_in: NDArray[np.integer], cmap: tuple[NDArray[T], ...]
-) -> NDArray[T]:
-    img = np.empty(shape=(*img_in.shape, 3), dtype=cmap[0].dtype)
-    for i in range(img_in.shape[0]):
-        for j in range(img_in.shape[1]):
-            img[i, j, :] = cmap[img_in[i, j]]
-    return img
 
 
 def _get_cell_dtype(n: int) -> np.dtype:
