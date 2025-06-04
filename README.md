@@ -54,7 +54,7 @@ for Segmentation-Free Analysis of In Situ Capture Data" *Small Methods* (2025)
 https://doi.org/10.1002/smtd.202401123
 
 ```
-@article{sainsc2024,
+@article{sainsc2025,
   author = {Müller-Bötticher, Niklas and Tiesmeyer, Sebastian and Eils, Roland and Ishaque, Naveed},
   title = {Sainsc: A Computational Tool for Segmentation-Free Analysis of In Situ Capture Data},
   journal = {Small Methods},
