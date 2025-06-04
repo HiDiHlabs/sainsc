@@ -16,7 +16,7 @@ Citations
 If you are using `sainsc` for your research please cite
 
 N. Müller-Bötticher, S. Tiesmeyer, R. Eils, N. Ishaque, "Sainsc: A Computational Tool
-for Segmentation-Free Analysis of In Situ Capture Data" *Small Methods* (2024)
+for Segmentation-Free Analysis of In Situ Capture Data" *Small Methods* (2025)
 https://doi.org/10.1002/smtd.202401123
 
 .. toctree::
