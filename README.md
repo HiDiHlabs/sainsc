@@ -50,17 +50,17 @@ This project follows the [SemVer](https://semver.org/) guidelines for versioning
 If you are using `sainsc` for your research please cite
 
 N. Müller-Bötticher, S. Tiesmeyer, R. Eils, N. Ishaque, "Sainsc: A Computational Tool
-for Segmentation-Free Analysis of In Situ Capture Data" *Small Methods* (2024)
+for Segmentation-Free Analysis of In Situ Capture Data" *Small Methods* (2025)
 https://doi.org/10.1002/smtd.202401123
 
 ```
-@article{sainsc2024,
+@article{sainsc2025,
   author = {Müller-Bötticher, Niklas and Tiesmeyer, Sebastian and Eils, Roland and Ishaque, Naveed},
   title = {Sainsc: A Computational Tool for Segmentation-Free Analysis of In Situ Capture Data},
   journal = {Small Methods},
-  year = {2024},
-  volume = {},
-  number = {},
+  year = {2025},
+  volume = {9},
+  number = {5},
   pages = {2401123},
   doi = {10.1002/smtd.202401123},
 }
