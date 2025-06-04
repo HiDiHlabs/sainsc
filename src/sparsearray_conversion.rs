@@ -45,11 +45,11 @@ where
 {
     let (indptr, indices, data) = cs.into_raw_storage();
 
-    return (
+    (
         data.into_pyarray(py),
         indices.into_pyarray(py),
         indptr.into_pyarray(py),
-    );
+    )
 }
 
 impl<'py, N: Element, I: SpIndex + Element, Iptr: SpIndex + Element> IntoPyObject<'py>
