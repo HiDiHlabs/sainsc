@@ -1,6 +1,5 @@
 mod coordinates;
 mod cosine;
-mod cosine_zarr;
 mod gridcounts;
 mod sparsearray_conversion;
 mod sparsekde;

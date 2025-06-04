@@ -1,4 +1,3 @@
-use crate::cosine_zarr::{initialize_cosine_zarrstore, write_cosine_to_zarr, ZarrChunkInfo};
 use crate::gridcounts::GridCounts;
 use crate::sparsekde::sparse_kde_csx_;
 use crate::utils::create_pool;
@@ -13,23 +12,20 @@ use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
 use pyo3::{exceptions::PyValueError, prelude::*};
 use rayon::prelude::*;
 use sprs::{CompressedStorage::CSR, CsMatI, CsMatViewI, SpIndex};
-use std::{cmp::min, error::Error, ops::Range, path::PathBuf};
-use zarrs::array::Element;
+use std::{cmp::min, error::Error, ops::Range};
 
 macro_rules! build_cos_ct_fn {
     ($name:tt, $t_cos:ty, $t_ct:ty) => {
         #[pyfunction]
-        #[pyo3(signature = (counts, genes, celltypes, signatures, kernel, *, log=false, zarr_path=None, chunk_size=(500, 500), n_threads=None))]
+        #[pyo3(signature = (counts, genes, signatures, kernel, *, log=false, chunk_size=(500, 500), n_threads=None))]
         /// calculate cosine similarity and assign celltype
         pub fn $name<'py>(
             py: Python<'py>,
             counts: &mut GridCounts,
             genes: Vec<String>,
-            celltypes: Vec<String>,
             signatures: PyReadonlyArray2<'py, $t_cos>,
             kernel: PyReadonlyArray2<'py, $t_cos>,
             log: bool,
-            zarr_path:Option<PathBuf>,
             chunk_size: (usize, usize),
             n_threads: Option<usize>,
         ) -> PyResult<(
@@ -50,12 +46,10 @@ macro_rules! build_cos_ct_fn {
 
             let cos_ct = chunk_and_calculate_cosine(
                 &gene_counts,
-                celltypes,
                 signatures.as_array(),
                 kernel.as_array(),
                 counts.shape,
                 log,
-                zarr_path,
                 chunk_size,
                 n_threads
             );
@@ -77,19 +71,17 @@ build_cos_ct_fn!(cosinef32_and_celltypei16, f32, i16);
 
 fn chunk_and_calculate_cosine<C, I, F, U>(
     counts: &[CsMatViewI<C, I>],
-    celltypes: Vec<String>,
     signatures: ArrayView2<F>,
     kernel: ArrayView2<F>,
     shape: (usize, usize),
     log: bool,
-    zarr_path: Option<PathBuf>,
     chunk_size: (usize, usize),
     n_threads: Option<usize>,
-) -> Result<(Array2<F>, Array2<F>, Array2<U>), Box<dyn Error + Send + Sync>>
+) -> Result<(Array2<F>, Array2<F>, Array2<U>), Box<dyn Error>>
 where
     C: NumCast + Copy + Sync + Send + Default,
     I: SpIndex + Signed + Sync + Send,
-    F: NdFloat + Element,
+    F: NdFloat,
     U: PrimInt + Signed + Sync + Send,
     Slice: From<Range<I>>,
 {
@@ -123,16 +115,7 @@ where
             }
         });
 
-    // init zarr store for celltypes with chunksize and all zero arrays
-    let zarr_store = match zarr_path
-        .map(|path| initialize_cosine_zarrstore(path, &celltypes, shape, chunk_size))
-    {
-        Some(Err(e)) => return Err(e),
-        Some(Ok(store)) => Some(store),
-        None => None,
-    };
-
-    let celltyping_results = pool.install(|| {
+    let ((cosine, score), celltype): ((Vec<_>, Vec<_>), Vec<_>) = pool.install(|| {
         // generate all chunk indices
         let chunk_indices: Vec<_> = (0..m).cartesian_product(0..n).collect();
 
@@ -142,12 +125,6 @@ where
             .map(|idx| {
                 let (chunk, unpad) = get_chunk(counts, idx, shape, chunk_size, pad);
 
-                let zarr_info = zarr_store.clone().map(|store| ZarrChunkInfo {
-                    store,
-                    celltypes: { celltypes.clone() },
-                    chunk_idx: vec![idx.0 as u64, idx.1 as u64],
-                });
-
                 cosine_and_celltype_(
                     chunk,
                     signatures,
@@ -155,14 +132,10 @@ where
                     kernel,
                     unpad,
                     log,
-                    zarr_info,
                 )
             })
-            .collect::<Vec<_>>()
+            .unzip()
     });
-
-    let ((cosine, score), celltype): ((Vec<_>, Vec<_>), Vec<_>) =
-        itertools::process_results(celltyping_results, |iter| iter.unzip())?;
 
     // concatenate all chunks back to original shape
     Ok((
@@ -234,11 +207,10 @@ fn cosine_and_celltype_<C, I, F, U>(
     kernel: ArrayView2<F>,
     unpad: (Range<usize>, Range<usize>),
     log: bool,
-    zarr_info: Option<ZarrChunkInfo>,
-) -> Result<((Array2<F>, Array2<F>), Array2<U>), Box<dyn Error + Send + Sync>>
+) -> ((Array2<F>, Array2<F>), Array2<U>)
 where
     C: NumCast + Copy,
-    F: NdFloat + Element,
+    F: NdFloat,
     U: PrimInt + Signed,
     I: SpIndex + Signed,
     Slice: From<Range<I>>,
@@ -253,10 +225,10 @@ where
         // fastpath if all csx are empty
         None => {
             let shape = (unpad_r.end - unpad_r.start, unpad_c.end - unpad_c.start);
-            Ok((
+            (
                 (Array2::zeros(shape), Array2::zeros(shape)),
                 Array2::from_elem(shape, -one::<U>()),
-            ))
+            )
         }
         Some((csx, weights)) => {
             let shape = csx.shape();
@@ -290,24 +262,8 @@ where
                     .filter(|(_, &w)| w != zero::<F>())
                     .for_each(|(mut cos, &w)| cos += &kde_unpadded.map(|&x| x * w));
             }
-
-            kde_norm.mapv_inplace(F::sqrt);
-
-            if let Some(zarr_info) = zarr_info {
-                write_cosine_to_zarr(
-                    zarr_info.store,
-                    &cosine,
-                    &kde_norm,
-                    &zarr_info.celltypes,
-                    &zarr_info.chunk_idx,
-                )?
-            };
-
-            Ok(get_max_cosine_and_celltype(
-                cosine,
-                kde_norm,
-                pairwise_correction,
-            ))
+            // TODO: write to zarr
+            get_max_cosine_and_celltype(cosine, kde_norm, pairwise_correction)
         }
     }
 }
@@ -335,8 +291,9 @@ where
                 *ct = -one::<I>();
                 *s = zero();
             } else {
-                *cos /= norm;
-                *s /= norm;
+                let norm_sqrt = norm.sqrt();
+                *cos /= norm_sqrt;
+                *s /= norm_sqrt;
             };
         });
 
