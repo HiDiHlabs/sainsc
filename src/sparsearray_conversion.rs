@@ -22,7 +22,7 @@ static SPMATRIX: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
 pub struct WrappedCsx<N, I: SpIndex, Iptr: SpIndex>(pub CsMatI<N, I, Iptr>);
 
 fn get_scipy_sparse(py: Python) -> PyResult<&Py<PyModule>> {
-    SP_SPARSE.get_or_try_init(py, || Ok(py.import_bound("scipy.sparse")?.unbind()))
+    SP_SPARSE.get_or_try_init(py, || Ok(py.import("scipy.sparse")?.unbind()))
 }
 
 fn get_scipy_sparse_attr(py: Python, attr: &str) -> PyResult<PyObject> {
@@ -46,16 +46,20 @@ where
     let (indptr, indices, data) = cs.into_raw_storage();
 
     return (
-        data.into_pyarray_bound(py),
-        indices.into_pyarray_bound(py),
-        indptr.into_pyarray_bound(py),
+        data.into_pyarray(py),
+        indices.into_pyarray(py),
+        indptr.into_pyarray(py),
     );
 }
 
-impl<N: Element, I: SpIndex + Element, Iptr: SpIndex + Element> IntoPy<PyObject>
+impl<'py, N: Element, I: SpIndex + Element, Iptr: SpIndex + Element> IntoPyObject<'py>
     for WrappedCsx<N, I, Iptr>
 {
-    fn into_py(self, py: Python<'_>) -> PyObject {
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
+    type Error = PyErr; // TODO: propagate better errors?
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
         let csx = self.0;
         let shape = csx.shape();
 
@@ -67,16 +71,14 @@ impl<N: Element, I: SpIndex + Element, Iptr: SpIndex + Element> IntoPy<PyObject>
         sparray
             .unwrap()
             .call1(py, (make_csx_tuple(py, csx), shape))
-            .unwrap()
-            .extract(py)
-            .unwrap()
+            .map(move |x| x.into_bound(py))
     }
 }
-impl<'py, N: Element, I: SpIndex + Element, Iptr: SpIndex + Element> FromPyObject<'py>
+impl<'py, N: Element + Clone, I: SpIndex + Element, Iptr: SpIndex + Element> FromPyObject<'py>
     for WrappedCsx<N, I, Iptr>
 {
     fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
-        fn boundpyarray_to_vec<T: Element>(obj: Bound<'_, PyAny>) -> PyResult<Vec<T>> {
+        fn boundpyarray_to_vec<T: Element + Clone>(obj: Bound<'_, PyAny>) -> PyResult<Vec<T>> {
             Ok(obj.extract::<PyReadonlyArray1<T>>()?.as_array().to_vec())
         }
 

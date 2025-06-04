@@ -20,9 +20,7 @@ pub fn coordinate_as_string<'py>(
     n_threads: Option<usize>,
 ) -> PyResult<Bound<'py, PyArray1<PyFixedString<12>>>> {
     match string_coordinate_index_(x.as_array(), y.as_array(), n_threads) {
-        Ok(string_coordinates) => Ok(string_coordinates
-            .map(|s| (*s).into())
-            .into_pyarray_bound(py)),
+        Ok(string_coordinates) => Ok(string_coordinates.map(|s| (*s).into()).into_pyarray(py)),
         Err(e) => Err(PyRuntimeError::new_err(e.to_string())),
     }
 }
@@ -40,10 +38,7 @@ pub fn categorical_coordinate<'py>(
     Bound<'py, PyArray2<CoordInt>>,
 )> {
     match categorical_coordinate_(x.as_array(), y.as_array(), n_threads) {
-        Ok((codes, coordinates)) => Ok((
-            codes.into_pyarray_bound(py),
-            coordinates.into_pyarray_bound(py),
-        )),
+        Ok((codes, coordinates)) => Ok((codes.into_pyarray(py), coordinates.into_pyarray(py))),
         Err(e) => Err(PyRuntimeError::new_err(e.to_string())),
     }
 }

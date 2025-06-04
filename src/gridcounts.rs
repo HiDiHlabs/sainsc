@@ -281,7 +281,7 @@ impl GridCounts {
 
     fn __getstate__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
         match serialize(&(&self.counts, self.shape, self.resolution, self.n_threads)) {
-            Ok(bytes) => Ok(PyBytes::new_bound(py, &bytes)),
+            Ok(bytes) => Ok(PyBytes::new(py, &bytes)),
             Err(e) => Err(PyRuntimeError::new_err(e.to_string())),
         }
     }
@@ -379,7 +379,7 @@ impl GridCounts {
         });
 
         let gridcounts = triplet_to_dense(TriMatI::from_triplets(self.shape, i, j, v));
-        Python::with_gil(|py| gridcounts.into_pyarray_bound(py).unbind())
+        Python::with_gil(|py| gridcounts.into_pyarray(py).unbind())
     }
 
     fn select_genes(&mut self, genes: HashSet<String>) {

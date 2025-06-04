@@ -2,7 +2,7 @@
 name         = "_utils_rust"
 version      = "0.1.0"
 edition      = "2021"
-rust-version = "1.76.0"
+rust-version = "1.85.0"
 
 [lib]
 name       = "_utils_rust"
@@ -15,10 +15,10 @@ itertools     = { version = "0.12.1" }
 ndarray       = { version = "0.15.6", features = ["rayon"] }
 ndarray-stats = { version = "0.5.1" }
 num           = { version = "0.4.1" }
-numpy         = { version = "0.21" }
-polars        = { version = "0.44", features = ["partition_by", "dtype-categorical"] }
-polars-arrow  = { version = "0.44" }
-pyo3          = { version = "0.21", features = ["extension-module"] }
-pyo3-polars   = { version = "0.18", features = ["dtype-categorical"] }
+numpy         = { version = "0.24" }
+polars        = { version = "0.48", features = ["partition_by", "dtype-categorical"] }
+polars-arrow  = { version = "0.48" }
+pyo3          = { version = "0.24.2", features = ["extension-module"] }
+pyo3-polars   = { version = "0.21", features = ["dtype-categorical"] }
 rayon         = { version = "1.8" }
 sprs          = { version = "= 0.11.1", features = ["serde"] }
