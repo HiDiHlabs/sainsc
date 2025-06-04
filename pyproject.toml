@@ -1,5 +1,5 @@
 [build-system]
-requires      = ["setuptools>=61.0.0", "setuptools_scm[toml]>=6.2", "setuptools-rust>=1.7"]
+requires      = ["setuptools>=64", "setuptools-scm>=8", "setuptools-rust>=1.10"]
 build-backend = "setuptools.build_meta"
 
 
@@ -7,8 +7,9 @@ build-backend = "setuptools.build_meta"
 name            = "sainsc"
 description     = "Segmentation-free Analysis of In Situ Capture data"
 readme          = { file = "README.md", content-type = "text/markdown" }
-license         = { file = "LICENSE" }
-requires-python = ">=3.10,<3.13"
+license         = "MIT"
+license-files   = ["LICENSE"]
+requires-python = ">=3.11,<3.14"
 dynamic         = ["version"]
 
 authors = [
@@ -17,20 +18,17 @@ authors = [
 dependencies = [
     "anndata>=0.9",
     "h5py>=3",
-    "matplotlib",
+    "matplotlib>=3.7",
     "matplotlib-scalebar",
-    "numba>=0.44",
-    "numpy>=1.21",
-    "pandas",
+    "numpy>=1.24",
+    "pandas>=2.0",
     "polars[pandas]>=1",
-    "scikit-image>=0.18",
-    "scipy>=1.9",
+    "scikit-image>=0.20",
+    "scipy>=1.10",
     "seaborn>=0.11",
-    "typing-extensions>=4",
 ]
 classifiers = [
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
@@ -72,20 +70,21 @@ include = ["sainsc", "sainsc.io", "sainsc.lazykde", "sainsc.utils"]
 [[tool.setuptools-rust.ext-modules]]
 target = "sainsc._utils_rust"
 
-[tool.isort]
-profile = "black"
-
-[tool.black]
-target-version = ["py310", "py311", "py312"]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
+
+fix        = true
+show-fixes = true
+
+[tool.ruff.lint]
+extend-select = ["I"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["E402"]
 
 [tool.mypy]
-python_version         = "3.10"
+python_version         = "3.11"
 ignore_missing_imports = true
 warn_no_return         = false
 packages               = "sainsc"

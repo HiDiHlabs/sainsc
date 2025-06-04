@@ -56,9 +56,9 @@ macro_rules! build_cos_ct_fn {
 
             match cos_ct {
                 Ok((cosine, score, celltype_map)) => Ok((
-                    cosine.into_pyarray_bound(py),
-                    score.into_pyarray_bound(py),
-                    celltype_map.into_pyarray_bound(py),
+                    cosine.into_pyarray(py),
+                    score.into_pyarray(py),
+                    celltype_map.into_pyarray(py),
                 )),
                 Err(e) => Err(PyValueError::new_err(e.to_string())),
             }
