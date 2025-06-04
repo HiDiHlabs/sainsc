@@ -281,7 +281,7 @@ class LazyKDE:
 
     def load_local_maxima(
         self, genes: Iterable[str] | None = None, *, spatialdata: bool = False
-    ) -> "AnnData | SpatialData":
+    ) -> AnnData | SpatialData:
         """
         Load the gene expression (KDE) of the local maxima.
 
