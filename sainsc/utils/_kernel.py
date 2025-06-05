@@ -2,27 +2,29 @@ import math
 from typing import TypeVar
 
 import numpy as np
-from numpy.typing import DTypeLike, NDArray
+from numpy.typing import DTypeLike
 from scipy import ndimage, signal
 
 T = TypeVar("T", bound=np.number)
 
 
-def _make_circular_mask(radius: int) -> NDArray[np.bool_]:
+def _make_circular_mask(radius: int) -> np.ndarray[tuple[int, int], np.dtype[np.bool_]]:
     diameter = radius * 2 + 1
     x, y = np.ogrid[:diameter, :diameter]
     dist_from_center = np.sqrt((x - radius) ** 2 + (y - radius) ** 2)
     return dist_from_center <= radius
 
 
-def _make_circular_kernel(kernel: NDArray[T], radius: int) -> NDArray[T]:
+def _make_circular_kernel(
+    kernel: np.ndarray[tuple[int, int], np.dtype[T]], radius: int
+) -> np.ndarray[tuple[int, int], np.dtype[T]]:
     kernel[~_make_circular_mask(radius)] = 0
     return kernel
 
 
 def gaussian_kernel(
     bw: float, radius: int, *, dtype: DTypeLike = np.float32, circular: bool = False
-) -> NDArray:
+) -> np.ndarray[tuple[int, int], np.dtype]:
     """
     Generate a 2D Gaussian kernel array.
 
@@ -55,7 +57,9 @@ def gaussian_kernel(
     return gaussian_kernel
 
 
-def epanechnikov_kernel(bw: float, *, dtype: DTypeLike = np.float32) -> np.ndarray:
+def epanechnikov_kernel(
+    bw: float, *, dtype: DTypeLike = np.float32
+) -> np.ndarray[tuple[int, int], np.dtype]:
     """
     Generate a 2D Epanechnikov kernel array.
 

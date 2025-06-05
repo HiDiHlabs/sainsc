@@ -8,11 +8,14 @@ from numpy.typing import NDArray
 from scipy.sparse import csr_matrix, sparray, spmatrix
 from skimage.measure import label, regionprops
 
+from .._typealias import _AssignmentScoreMap, _CosineMap, _Kernel, _SignatureArray
 from .._utils import _get_coordinate_index
 from .._utils_rust import GridCounts
 
 T = TypeVar("T", bound=np.number)
 U = TypeVar("U", bound=np.bool_ | np.integer)
+N = TypeVar("N", bound=int)
+_Shape = TypeVar("_Shape", bound=tuple[int, ...])
 
 SCALEBAR_PARAMS = dict(box_alpha=0, color="w")
 """Default scalebar parameters"""
@@ -22,7 +25,9 @@ def _get_cell_dtype(n: int) -> np.dtype[np.signedinteger]:
     return np.result_type(np.int8, n)
 
 
-def _filter_blobs(labeled_map: NDArray[U], min_blob_area: int) -> NDArray[U]:
+def _filter_blobs(
+    labeled_map: np.ndarray[_Shape, np.dtype[U]], min_blob_area: int
+) -> np.ndarray[_Shape, np.dtype[U]]:
     # remove small blops (i.e. "cells")
     if min_blob_area <= 0:
         raise ValueError("Area must be bigger than 0")
@@ -37,7 +42,7 @@ def _filter_blobs(labeled_map: NDArray[U], min_blob_area: int) -> NDArray[U]:
 def _localmax_anndata(
     kde: spmatrix | sparray | NDArray,
     genelist: Iterable[str],
-    coord: tuple[NDArray[np.integer], ...],
+    coord: tuple[np.ndarray[tuple[N], np.dtype[np.integer]], ...],
     *,
     name: str | None = None,
     n_threads: int = 1,
@@ -59,10 +64,14 @@ class CosineCelltypeCallable(Protocol):
         self,
         counts: GridCounts,
         genes: list[str],
-        signatures: NDArray[np.float32],
-        kernel: NDArray[np.float32],
+        signatures: _SignatureArray,
+        kernel: _Kernel,
         *,
         log: bool = ...,
         chunk_size: tuple[int, int] = ...,
         n_threads: int | None = ...,
-    ) -> tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.signedinteger]]: ...
+    ) -> tuple[
+        _CosineMap,
+        _AssignmentScoreMap,
+        np.ndarray[tuple[int, int], np.dtype[np.signedinteger]],
+    ]: ...

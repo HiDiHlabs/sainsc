@@ -1,13 +1,20 @@
 from typing import Self
 
 import numpy as np
-from numpy.typing import NDArray
 from polars import DataFrame
 
-from ._typealias import _Csx, _CsxArray
+from ._typealias import (
+    _AssignmentScoreMap,
+    _Coord,
+    _CosineMap,
+    _Csx,
+    _CsxArray,
+    _Kernel,
+    _SignatureArray,
+)
 
 def sparse_kde_csx_py(
-    counts: _Csx, kernel: NDArray[np.float32], *, threshold: float = 0
+    counts: _Csx, kernel: _Kernel, *, threshold: float = 0
 ) -> _CsxArray:
     """
     Calculate the KDE for each spot with counts as uint16.
@@ -16,8 +23,11 @@ def sparse_kde_csx_py(
 def kde_at_coord(
     counts: GridCounts,
     genes: list[str],
-    kernel: NDArray[np.float32],
-    coordinates: tuple[NDArray[np.int_], NDArray[np.int_]],
+    kernel: _Kernel,
+    coordinates: tuple[
+        np.ndarray[tuple[int], np.dtype[np.int_]],
+        np.ndarray[tuple[int], np.dtype[np.int_]],
+    ],
     *,
     n_threads: int | None = None,
 ) -> _CsxArray:
@@ -26,15 +36,18 @@ def kde_at_coord(
     """
 
 def categorical_coordinate(
-    x: NDArray[np.int32], y: NDArray[np.int32], *, n_threads: int | None = None
-) -> tuple[NDArray[np.int32], NDArray[np.int32]]:
+    x: _Coord, y: _Coord, *, n_threads: int | None = None
+) -> tuple[
+    np.ndarray[tuple[int], np.dtype[np.int32]],
+    np.ndarray[tuple[int, int], np.dtype[np.int32]],
+]:
     """
     Get the codes and the coordinates (comparable to a pandas.Categorical)
     """
 
 def coordinate_as_string(
-    x: NDArray[np.int32], y: NDArray[np.int32], *, n_threads: int | None = None
-) -> NDArray[np.str_]:
+    x: _Coord, y: _Coord, *, n_threads: int | None = None
+) -> np.ndarray[tuple[int], np.dtype[np.str_]]:
     """
     Concatenate two int arrays elementwise into a string representation (i.e. 'x_y').
     """
@@ -42,13 +55,15 @@ def coordinate_as_string(
 def cosinef32_and_celltypei8(
     counts: GridCounts,
     genes: list[str],
-    signatures: NDArray[np.float32],
-    kernel: NDArray[np.float32],
+    signatures: _SignatureArray,
+    kernel: _Kernel,
     *,
     log: bool = False,
     chunk_size: tuple[int, int] = (500, 500),
     n_threads: int | None = None,
-) -> tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.int8]]:
+) -> tuple[
+    _CosineMap, _AssignmentScoreMap, np.ndarray[tuple[int, int], np.dtype[np.int8]]
+]:
     """
     Calculate the cosine similarity given counts and signatures and assign the most
     similar celltype.
@@ -57,13 +72,15 @@ def cosinef32_and_celltypei8(
 def cosinef32_and_celltypei16(
     counts: GridCounts,
     genes: list[str],
-    signatures: NDArray[np.float32],
-    kernel: NDArray[np.float32],
+    signatures: _SignatureArray,
+    kernel: _Kernel,
     *,
     log: bool = False,
     chunk_size: tuple[int, int] = (500, 500),
     n_threads: int | None = None,
-) -> tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.int16]]:
+) -> tuple[
+    _CosineMap, _AssignmentScoreMap, np.ndarray[tuple[int, int], np.dtype[np.int16]]
+]:
     """
     Calculate the cosine similarity given counts and signatures and assign the most
     similar celltype.
@@ -186,7 +203,7 @@ class GridCounts:
             Mapping from gene to number of counts.
         """
 
-    def grid_counts(self) -> NDArray[np.uintc]:
+    def grid_counts(self) -> np.ndarray[tuple[int, int], np.dtype[np.uintc]]:
         """
         Counts per pixel.
 
@@ -231,7 +248,7 @@ class GridCounts:
             Range to crop as `(ymin, ymax)`
         """
 
-    def filter_mask(self, mask: NDArray[np.bool_]):
+    def filter_mask(self, mask: np.ndarray[tuple[int, int], np.dtype[np.bool_]]):
         """
         Filter all genes with a binary mask.
 

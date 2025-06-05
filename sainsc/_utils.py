@@ -4,7 +4,6 @@ from typing import Callable, NoReturn, ParamSpec, TypeVar
 
 import numpy as np
 import pandas as pd
-from numpy.typing import NDArray
 
 from ._utils_rust import coordinate_as_string
 
@@ -38,15 +37,18 @@ def validate_threads(func: Callable[P, T]) -> Callable[P, T]:
     return wrapper
 
 
+N = TypeVar("N", bound=int)
+
+
 def _get_coordinate_index(
-    x: NDArray[np.integer],
-    y: NDArray[np.integer],
+    x: np.ndarray[tuple[N], np.dtype[np.integer]],
+    y: np.ndarray[tuple[N], np.dtype[np.integer]],
     *,
     name: str | None = None,
     n_threads: int | None = None,
 ) -> pd.Index:
-    x_i32: NDArray[np.int32] = x.astype(np.int32, copy=False)
-    y_i32: NDArray[np.int32] = y.astype(np.int32, copy=False)
+    x_i32: np.ndarray[tuple[N], np.dtype[np.int32]] = x.astype(np.int32, copy=False)
+    y_i32: np.ndarray[tuple[N], np.dtype[np.int32]] = y.astype(np.int32, copy=False)
 
     return pd.Index(
         coordinate_as_string(x_i32, y_i32, n_threads=n_threads), dtype=str, name=name

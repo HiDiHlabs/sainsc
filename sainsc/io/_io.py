@@ -523,7 +523,10 @@ def read_StereoSeq_bins(
 
     obs = pd.DataFrame(
         index=_get_coordinate_index(
-            coordinates[:, 0], coordinates[:, 1], name="bin", n_threads=n_threads
+            coordinates[:, 0],  # type: ignore
+            coordinates[:, 1],  # type: ignore
+            name="bin",
+            n_threads=n_threads,
         )
     )
 
