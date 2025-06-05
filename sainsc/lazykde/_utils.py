@@ -18,8 +18,8 @@ SCALEBAR_PARAMS = dict(box_alpha=0, color="w")
 """Default scalebar parameters"""
 
 
-def _get_cell_dtype(n: int) -> np.dtype:
-    return np.result_type("int8", n)
+def _get_cell_dtype(n: int) -> np.dtype[np.signedinteger]:
+    return np.result_type(np.int8, n)
 
 
 def _filter_blobs(labeled_map: NDArray[U], min_blob_area: int) -> NDArray[U]:
