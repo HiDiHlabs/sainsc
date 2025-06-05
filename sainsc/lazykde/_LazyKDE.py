@@ -1196,7 +1196,15 @@ class LazyKDE:
             self._kernel = kernel.astype(np.float32)
 
     @property
-    def local_maxima(self) -> _Local_Max | None:
+    def local_maxima(
+        self,
+    ) -> (
+        tuple[
+            np.ndarray[tuple[int], np.dtype[np.int_]],
+            np.ndarray[tuple[int], np.dtype[np.int_]],
+        ]
+        | None
+    ):
         """
         tuple[numpy.ndarray[numpy.signedinteger], ...]: Coordinates of local maxima.
         """
