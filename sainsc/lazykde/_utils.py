@@ -17,7 +17,7 @@ U = TypeVar("U", bound=np.bool_ | np.integer)
 N = TypeVar("N", bound=int)
 _Shape = TypeVar("_Shape", bound=tuple[int, ...])
 
-SCALEBAR_PARAMS = dict(box_alpha=0, color="w")
+SCALEBAR_PARAMS = dict(frameon=False, color="w")
 """Default scalebar parameters"""
 
 
