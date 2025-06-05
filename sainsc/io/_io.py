@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Collection
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, get_args
@@ -457,7 +459,7 @@ def read_StereoSeq_bins(
     sep: str = "\t",
     n_threads: int | None = None,
     **kwargs,
-) -> "AnnData | SpatialData":
+) -> AnnData | SpatialData:
     """
     Read a Stereo-seq GEM file into bins.
 
@@ -521,7 +523,10 @@ def read_StereoSeq_bins(
 
     obs = pd.DataFrame(
         index=_get_coordinate_index(
-            coordinates[:, 0], coordinates[:, 1], name="bin", n_threads=n_threads
+            coordinates[:, 0],  # type: ignore
+            coordinates[:, 1],  # type: ignore
+            name="bin",
+            n_threads=n_threads,
         )
     )
 

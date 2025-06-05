@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 import pandas as pd
@@ -13,7 +15,7 @@ if TYPE_CHECKING:
 version = "v" + __version__
 
 
-def _get_signature_pooch() -> "Pooch":
+def _get_signature_pooch() -> Pooch:
     # use indirection to enable pooch as optional dependency w/o lazy loading
     try:
         import pooch

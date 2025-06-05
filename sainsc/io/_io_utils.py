@@ -5,9 +5,8 @@ from typing import Literal
 
 import numpy as np
 import polars as pl
-from numpy.typing import NDArray
 
-from .._typealias import _PathLike
+from .._typealias import _Coord, _PathLike
 from .._utils_rust import categorical_coordinate
 
 
@@ -20,8 +19,11 @@ def _bin_coordinates(df: pl.DataFrame, bin_size: float) -> pl.DataFrame:
 
 
 def _categorical_coordinate(
-    x: NDArray[np.int32], y: NDArray[np.int32], *, n_threads: int | None = None
-) -> tuple[NDArray[np.int32], NDArray[np.int32]]:
+    x: _Coord, y: _Coord, *, n_threads: int | None = None
+) -> tuple[
+    np.ndarray[tuple[int], np.dtype[np.int32]],
+    np.ndarray[tuple[int, int], np.dtype[np.int32]],
+]:
     assert len(x) == len(y)
 
     return categorical_coordinate(x, y, n_threads=n_threads)
