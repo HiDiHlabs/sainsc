@@ -59,6 +59,7 @@ def cosinef32_and_celltypei8(
     kernel: _Kernel,
     *,
     log: bool = False,
+    min_transcripts: int | None = None,
     chunk_size: tuple[int, int] = (500, 500),
     n_threads: int | None = None,
 ) -> tuple[
@@ -76,6 +77,7 @@ def cosinef32_and_celltypei16(
     kernel: _Kernel,
     *,
     log: bool = False,
+    min_transcripts: int | None = None,
     chunk_size: tuple[int, int] = (500, 500),
     n_threads: int | None = None,
 ) -> tuple[

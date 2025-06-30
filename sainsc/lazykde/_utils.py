@@ -68,6 +68,7 @@ class CosineCelltypeCallable(Protocol):
         kernel: _Kernel,
         *,
         log: bool = ...,
+        min_transcripts: int | None = ...,
         chunk_size: tuple[int, int] = ...,
         n_threads: int | None = ...,
     ) -> tuple[

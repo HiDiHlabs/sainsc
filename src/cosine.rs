@@ -12,12 +12,12 @@ use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
 use pyo3::{exceptions::PyValueError, prelude::*};
 use rayon::prelude::*;
 use sprs::{CompressedStorage::CSR, CsMatI, CsMatViewI, SpIndex};
-use std::{cmp::min, error::Error, ops::Range};
+use std::{cmp::min, error::Error, iter::Sum, ops::Range};
 
 macro_rules! build_cos_ct_fn {
     ($name:tt, $t_cos:ty, $t_ct:ty) => {
         #[pyfunction]
-        #[pyo3(signature = (counts, genes, signatures, kernel, *, log=false, chunk_size=(500, 500), n_threads=None))]
+        #[pyo3(signature = (counts, genes, signatures, kernel, *, log=false, min_transcripts=None, chunk_size=(500, 500), n_threads=None))]
         /// calculate cosine similarity and assign celltype
         pub fn $name<'py>(
             py: Python<'py>,
@@ -26,6 +26,7 @@ macro_rules! build_cos_ct_fn {
             signatures: PyReadonlyArray2<'py, $t_cos>,
             kernel: PyReadonlyArray2<'py, $t_cos>,
             log: bool,
+            min_transcripts: Option<u32>,
             chunk_size: (usize, usize),
             n_threads: Option<usize>,
         ) -> PyResult<(
@@ -50,6 +51,7 @@ macro_rules! build_cos_ct_fn {
                 kernel.as_array(),
                 counts.shape,
                 log,
+                min_transcripts,
                 chunk_size,
                 n_threads
             );
@@ -75,11 +77,12 @@ fn chunk_and_calculate_cosine<C, I, F, U>(
     kernel: ArrayView2<F>,
     shape: (usize, usize),
     log: bool,
+    min_transcripts: Option<C>,
     chunk_size: (usize, usize),
     n_threads: Option<usize>,
 ) -> Result<(Array2<F>, Array2<F>, Array2<U>), Box<dyn Error>>
 where
-    C: NumCast + Copy + Sync + Send + Default,
+    C: NumCast + Copy + Sync + Send + Default + PartialOrd + Sum + for<'a> Sum<&'a C>,
     I: SpIndex + Signed + Sync + Send,
     F: NdFloat,
     U: PrimInt + Signed + Sync + Send,
@@ -122,17 +125,22 @@ where
         // chunk and calculate cosine/celltype in parallel
         chunk_indices
             .into_par_iter()
-            .map(|idx| {
+            .filter_map(|idx| {
                 let (chunk, unpad) = get_chunk(counts, idx, shape, chunk_size, pad);
-
-                cosine_and_celltype_(
+                if let Some(min_t) = min_transcripts {
+                    let n: C = chunk.iter().map(|gene| gene.data().iter().sum::<C>()).sum();
+                    if n < min_t {
+                        return None;
+                    };
+                };
+                Some(cosine_and_celltype_(
                     chunk,
                     signatures,
                     &signature_similarity_correction,
                     kernel,
                     unpad,
                     log,
-                )
+                ))
             })
             .unzip()
     });
