@@ -308,6 +308,7 @@ impl GridCounts {
         repr.join("\n    ")
     }
 
+    #[pyo3(signature = (key, default=None))]
     fn get(
         &self,
         key: String,
