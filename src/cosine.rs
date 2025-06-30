@@ -125,22 +125,18 @@ where
         // chunk and calculate cosine/celltype in parallel
         chunk_indices
             .into_par_iter()
-            .filter_map(|idx| {
+            .map(|idx| {
                 let (chunk, unpad) = get_chunk(counts, idx, shape, chunk_size, pad);
-                if let Some(min_t) = min_transcripts {
-                    let n: C = chunk.iter().map(|gene| gene.data().iter().sum::<C>()).sum();
-                    if n < min_t {
-                        return None;
-                    };
-                };
-                Some(cosine_and_celltype_(
+
+                cosine_and_celltype_(
                     chunk,
                     signatures,
                     &signature_similarity_correction,
                     kernel,
                     unpad,
                     log,
-                ))
+                    min_transcripts,
+                )
             })
             .unzip()
     });
@@ -215,30 +211,33 @@ fn cosine_and_celltype_<C, I, F, U>(
     kernel: ArrayView2<F>,
     unpad: (Range<usize>, Range<usize>),
     log: bool,
+    min_transcripts: Option<C>,
 ) -> ((Array2<F>, Array2<F>), Array2<U>)
 where
-    C: NumCast + Copy,
+    C: NumCast + Copy + PartialOrd + Sum + for<'a> Sum<&'a C>,
     F: NdFloat,
     U: PrimInt + Signed,
     I: SpIndex + Signed,
     Slice: From<Range<I>>,
 {
     let (unpad_r, unpad_c) = unpad;
+
+    let mut sufficient_transcripts = true;
+    if let Some(min_t) = min_transcripts {
+        let n_transcripts: C = counts
+            .iter()
+            .map(|gene| gene.data().iter().sum::<C>())
+            .sum();
+        sufficient_transcripts = n_transcripts >= min_t;
+    };
+
     let mut csx_weights_iter = counts
         .into_iter()
         .zip(signatures.rows())
         .filter(|(csx, _)| csx.nnz() > 0);
 
     match csx_weights_iter.next() {
-        // fastpath if all csx are empty
-        None => {
-            let shape = (unpad_r.end - unpad_r.start, unpad_c.end - unpad_c.start);
-            (
-                (Array2::zeros(shape), Array2::zeros(shape)),
-                Array2::from_elem(shape, -one::<U>()),
-            )
-        }
-        Some((csx, weights)) => {
+        Some((csx, weights)) if sufficient_transcripts => {
             let shape = csx.shape();
             let mut kde = Array2::zeros(shape);
 
@@ -272,6 +271,14 @@ where
             }
             // TODO: write to zarr
             get_max_cosine_and_celltype(cosine, kde_norm, pairwise_correction)
+        }
+        // fastpath if all csx are empty or too few transcripts
+        _ => {
+            let shape = (unpad_r.end - unpad_r.start, unpad_c.end - unpad_c.start);
+            (
+                (Array2::zeros(shape), Array2::zeros(shape)),
+                Array2::from_elem(shape, -one::<U>()),
+            )
         }
     }
 }
