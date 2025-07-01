@@ -468,8 +468,8 @@ impl GridCounts {
         });
 
         if crop {
-            let row_range = first_to_last_range(mask, 1);
-            let col_range = first_to_last_range(mask, 0);
+            let row_range = first_to_last_range(mask, 0);
+            let col_range = first_to_last_range(mask, 1);
 
             self.crop(col_range, row_range)
         } else {
