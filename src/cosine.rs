@@ -1,4 +1,4 @@
-use crate::gridcounts::GridCounts;
+use crate::gridcounts::{GridCounts, GridCountsView};
 use crate::sparsekde::sparse_kde_csx_;
 use crate::utils::create_pool;
 
@@ -11,8 +11,8 @@ use num::{one, zero, NumCast, PrimInt, Signed};
 use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
 use pyo3::{exceptions::PyValueError, prelude::*};
 use rayon::prelude::*;
-use sprs::{CompressedStorage::CSR, CsMatI, CsMatViewI, SpIndex};
-use std::{cmp::min, error::Error, iter::Sum, ops::Range};
+use sprs::{CsMatI, SpIndex};
+use std::{error::Error, iter::Sum, ops::Range};
 
 macro_rules! build_cos_ct_fn {
     ($name:tt, $t_cos:ty, $t_ct:ty) => {
@@ -34,22 +34,13 @@ macro_rules! build_cos_ct_fn {
             Bound<'py, PyArray2<$t_cos>>,
             Bound<'py, PyArray2<$t_ct>>,
         )> {
-            // ensure that all count arrays are CSR
-            counts.to_format(CSR);
-            let gene_counts: Vec<_> = genes
-                .iter()
-                .map(|g| {
-                    counts
-                        .get_view(g)
-                        .ok_or(PyValueError::new_err("Not all genes exist"))
-                })
-                .collect::<Result<_, _>>()?;
+
+            let gene_counts = counts.get_views(genes).ok_or(PyValueError::new_err("Not all genes exist"))?;
 
             let cos_ct = chunk_and_calculate_cosine(
-                &gene_counts,
+                gene_counts,
                 signatures.as_array(),
                 kernel.as_array(),
-                counts.shape,
                 log,
                 min_transcripts,
                 chunk_size,
@@ -72,10 +63,9 @@ build_cos_ct_fn!(cosinef32_and_celltypei8, f32, i8);
 build_cos_ct_fn!(cosinef32_and_celltypei16, f32, i16);
 
 fn chunk_and_calculate_cosine<C, I, F, U>(
-    counts: &[CsMatViewI<C, I>],
+    counts: GridCountsView<C, I>,
     signatures: ArrayView2<F>,
     kernel: ArrayView2<F>,
-    shape: (usize, usize),
     log: bool,
     min_transcripts: Option<C>,
     chunk_size: (usize, usize),
@@ -91,7 +81,7 @@ where
     let pool = create_pool(n_threads)?;
 
     let pad = get_padding(kernel.shape());
-    let (m, n) = n_chunks(shape, chunk_size); // number of chunks
+    let (m, n) = n_chunks(counts.shape, chunk_size); // number of chunks
 
     let signature_similarity_correction = similarity_correction(&signatures);
 
@@ -103,7 +93,7 @@ where
         chunk_indices
             .into_par_iter()
             .map(|idx| {
-                let (chunk, unpad) = get_chunk(counts, idx, shape, chunk_size, pad);
+                let (chunk, unpad) = counts.get_chunk(idx, chunk_size, pad);
 
                 cosine_and_celltype_(
                     chunk,
@@ -158,29 +148,6 @@ fn similarity_correction<T: NdFloat>(arr: &ArrayView2<T>) -> Array2<T> {
     })
 }
 
-fn get_chunk<C: Clone + Default, I: SpIndex>(
-    counts: &[CsMatViewI<C, I>],
-    idx: (usize, usize),
-    shape: (usize, usize),
-    size: (usize, usize),
-    pad: (usize, usize),
-) -> (Vec<CsMatI<C, I>>, (Range<usize>, Range<usize>)) {
-    let (slice_row, unpad_row) = chunk_ranges(idx.0, size.0, shape.0, pad.0);
-    let (slice_col, unpad_col) = chunk_ranges(idx.1, size.1, shape.1, pad.1);
-    let chunk = counts
-        .iter()
-        .map(|c| {
-            c.slice_outer(slice_row.clone())
-                .transpose_view()
-                .to_other_storage()
-                .slice_outer(slice_col.clone())
-                .transpose_into()
-                .to_owned()
-        })
-        .collect();
-    (chunk, (unpad_row, unpad_col))
-}
-
 fn concat_1d<T: Clone + Sync + Send>(
     chunks: &[Array2<T>],
     axis: usize,
@@ -202,15 +169,6 @@ fn concat_2d<T: Clone + Sync + Send>(
             .collect::<Result<Vec<_>, _>>()?),
         0,
     )
-}
-
-fn chunk_ranges(i: usize, step: usize, n: usize, pad: usize) -> (Range<usize>, Range<usize>) {
-    let start_raw = min(n, i * step);
-    let start_pad = start_raw.saturating_sub(pad);
-    let start_unpad = start_raw.saturating_sub(start_pad);
-    let chunk_pad = start_pad..min(n, (i + 1) * step + pad);
-    let chunk_unpad = start_unpad..(start_unpad + min(step, n - start_raw));
-    (chunk_pad, chunk_unpad)
 }
 
 fn cosine_and_celltype_<C, I, F, U>(

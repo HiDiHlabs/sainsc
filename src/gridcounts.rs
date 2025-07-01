@@ -34,7 +34,7 @@ use std::{
     cmp::min,
     collections::{HashMap, HashSet},
     iter::repeat,
-    ops::AddAssign,
+    ops::{AddAssign, Range},
 };
 
 pub type Count = u32;
@@ -43,11 +43,11 @@ pub type CsxIndex = i32;
 type GeneCountsPy = HashMap<String, WrappedCsx<Count, CsxIndex, CsxIndex>>;
 type GeneCountsRs = HashMap<String, CsMatI<Count, CsxIndex, CsxIndex>>;
 
-// Class implementation
+// Class implementations
 
 #[pyclass(mapping, module = "sainsc")]
 pub struct GridCounts {
-    counts: HashMap<String, CsMatI<Count, CsxIndex>>,
+    counts: GeneCountsRs,
     #[pyo3(get)]
     pub shape: (usize, usize),
     #[pyo3(get)]
@@ -60,6 +60,27 @@ pub struct GridCounts {
 impl GridCounts {
     pub fn get_view(&self, gene: &String) -> Option<CsMatViewI<Count, CsxIndex>> {
         self.counts.get(gene).map(|x| x.view())
+    }
+
+    ///TODO: rename
+    pub fn get_views<'a>(
+        &'a mut self,
+        genes: Vec<String>,
+    ) -> Option<GridCountsView<'a, Count, CsxIndex>> {
+        // ensure that all count arrays are CSR
+        self.to_format(CSR);
+        let gene_counts = genes
+            .iter()
+            .map(|g| self.get_view(g))
+            .collect::<Option<Vec<_>>>();
+
+        // TODO: new method for GridCountsView
+        gene_counts.map(|x| GridCountsView {
+            genes,
+            counts: x,
+            shape: self.shape,
+            resolution: self.resolution,
+        })
     }
 
     pub fn to_format(&mut self, format: CompressedStorage) {
@@ -495,6 +516,44 @@ impl GridCounts {
     }
 }
 
+/// A subset of genes of a GridCounts object
+pub struct GridCountsView<'a, C, I: SpIndex> {
+    pub genes: Vec<String>,
+    pub counts: Vec<CsMatViewI<'a, C, I>>,
+    pub shape: (usize, usize),
+    pub resolution: Option<f32>,
+}
+
+impl<'a, C, I> GridCountsView<'a, C, I>
+where
+    C: Clone + Default,
+    I: SpIndex,
+{
+    pub fn get_chunk(
+        &self,
+        idx: (usize, usize),
+        size: (usize, usize),
+        pad: (usize, usize),
+    ) -> (Vec<CsMatI<C, I>>, (Range<usize>, Range<usize>)) {
+        let (n, m) = self.shape;
+        let (slice_row, unpad_row) = chunk_ranges(idx.0, size.0, n, pad.0);
+        let (slice_col, unpad_col) = chunk_ranges(idx.1, size.1, m, pad.1);
+        let chunk = self
+            .counts
+            .iter()
+            .map(|c| {
+                c.slice_outer(slice_row.clone())
+                    .transpose_view()
+                    .to_other_storage()
+                    .slice_outer(slice_col.clone())
+                    .transpose_into()
+                    .to_owned()
+            })
+            .collect();
+        (chunk, (unpad_row, unpad_col))
+    }
+}
+
 // helper functions
 
 fn first_to_last_range(arr: ArrayView2<'_, bool>, axis: usize) -> (Option<usize>, Option<usize>) {
@@ -503,4 +562,13 @@ fn first_to_last_range(arr: ArrayView2<'_, bool>, axis: usize) -> (Option<usize>
         arr_reduced.iter().position(|&x| x),
         arr_reduced.iter().rposition(|&x| x).map(|i| i + 1),
     )
+}
+
+fn chunk_ranges(i: usize, step: usize, n: usize, pad: usize) -> (Range<usize>, Range<usize>) {
+    let start_raw = min(n, i * step);
+    let start_pad = start_raw.saturating_sub(pad);
+    let start_unpad = start_raw.saturating_sub(start_pad);
+    let chunk_pad = start_pad..min(n, (i + 1) * step + pad);
+    let chunk_unpad = start_unpad..(start_unpad + min(step, n - start_raw));
+    (chunk_pad, chunk_unpad)
 }
