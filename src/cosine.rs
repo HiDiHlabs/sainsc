@@ -97,26 +97,7 @@ where
     let pad = ((kernelsize[0] - 1) / 2, (kernelsize[1] - 1) / 2);
     let (m, n) = (nrow.div_ceil(srow), ncol.div_ceil(scol)); // number of chunks
 
-    let n_celltype = signatures.ncols();
-    let signature_similarity_correction =
-        Array2::from_shape_fn((n_celltype, n_celltype), |(i, j)| {
-            if i != j {
-                let sig1 = signatures.index_axis(Axis(1), i);
-                let sig2 = signatures.index_axis(Axis(1), j);
-                // technically we want the dot_product of s=(sig1-sig2) with a vector where
-                // the negative dimensions of this vector are set to zero (x),
-                // but these will then cancel out anyway so we can simplify to using the
-                // dot product with itself s . x => x . x
-                // additional we need to divide by the norm of x
-                // as the norm is the sqrt of the dot product with itself (which we
-                // already calculated) divided by its sqrt we end up with
-                // s . x / norm(x) = x . x / sqrt(x . x) = sqrt(x . x)
-                let x = (&sig1 - &sig2).mapv(|x| if x <= zero() { zero() } else { x });
-                x.dot(&x).sqrt()
-            } else {
-                zero()
-            }
-        });
+    let signature_similarity_correction = similarity_correction(&signatures);
 
     let ((cosine, score), celltype): ((Vec<_>, Vec<_>), Vec<_>) = pool.install(|| {
         // generate all chunk indices
@@ -147,6 +128,28 @@ where
         concat_2d(&score, n)?,
         concat_2d(&celltype, n)?,
     ))
+}
+
+fn similarity_correction<T: NdFloat>(arr: &ArrayView2<T>) -> Array2<T> {
+    let n_cols = arr.ncols();
+    Array2::from_shape_fn((n_cols, n_cols), |(i, j)| {
+        if i != j {
+            let sig1 = arr.index_axis(Axis(1), i);
+            let sig2 = arr.index_axis(Axis(1), j);
+            // technically we want the dot_product of s=(sig1-sig2) with a vector where
+            // the negative dimensions of this vector are set to zero (x),
+            // but these will then cancel out anyway so we can simplify to using the
+            // dot product with itself s . x => x . x
+            // additional we need to divide by the norm of x
+            // as the norm is the sqrt of the dot product with itself (which we
+            // already calculated) divided by its sqrt we end up with
+            // s . x / norm(x) = x . x / sqrt(x . x) = sqrt(x . x)
+            let x = (&sig1 - &sig2).mapv(|x| if x <= zero() { zero() } else { x });
+            x.dot(&x).sqrt()
+        } else {
+            zero()
+        }
+    })
 }
 
 fn get_chunk<C: Clone + Default, I: SpIndex>(
