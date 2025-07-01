@@ -8,8 +8,8 @@ use zarrs::{
     group::{Group, GroupBuilder, GroupMetadataV3},
 };
 
-const CT_PATH_PREFIX: &str = "/cosine";
-const KDE_PATH: &str = "/kde";
+const CT_PATH_PREFIX: &str = "/cosine_similarity";
+const KDE_PATH: &str = "/kde_l2";
 
 pub struct ZarrChunkInfo {
     pub store: Arc<FilesystemStore>,
@@ -17,7 +17,7 @@ pub struct ZarrChunkInfo {
     pub chunk_idx: Vec<u64>,
 }
 
-pub fn initialize_cosine_zarrstore(
+pub fn initialize_zarr(
     path: PathBuf,
     celltypes: &[String],
     shape: (usize, usize),
@@ -71,7 +71,7 @@ pub fn initialize_cosine_zarrstore(
     Ok(store)
 }
 
-pub fn write_cosine_to_zarr<T: NdFloat + Element>(
+pub fn cosine_similarity_to_zarr<T: NdFloat + Element>(
     zarr_store: Arc<FilesystemStore>,
     cosine: &Array3<T>,
     kde_norm: &Array2<T>,

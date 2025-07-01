@@ -1,7 +1,7 @@
 use crate::gridcounts::GridCounts;
 use crate::sparsekde::sparse_kde_csx_;
 use crate::utils::create_pool;
-use crate::zarrstore::{initialize_cosine_zarrstore, write_cosine_to_zarr, ZarrChunkInfo};
+use crate::zarrstore::{cosine_similarity_to_zarr, initialize_zarr, ZarrChunkInfo};
 use itertools::Itertools;
 use ndarray::{
     concatenate, s, Array2, Array3, ArrayView1, ArrayView2, Axis, NdFloat, NewAxis, ShapeError,
@@ -23,10 +23,12 @@ macro_rules! build_cos_ct_fn {
         pub fn $name<'py>(
             py: Python<'py>,
             counts: &mut GridCounts,
-            genes: Vec<String>,celltypes: Vec<String>,
+            genes: Vec<String>,
+            celltypes: Vec<String>,
             signatures: PyReadonlyArray2<'py, $t_cos>,
             kernel: PyReadonlyArray2<'py, $t_cos>,
-            log: bool,zarr_path:Option<PathBuf>,
+            log: bool,
+            zarr_path:Option<PathBuf>,
             chunk_size: (usize, usize),
             n_threads: Option<usize>,
         ) -> PyResult<(
@@ -119,13 +121,12 @@ where
         });
 
     // init zarr store for celltypes with chunksize and all zero arrays
-    let zarr_store = match zarr_path
-        .map(|path| initialize_cosine_zarrstore(path, &celltypes, shape, chunk_size, (m, n)))
-    {
-        Some(Err(e)) => return Err(e),
-        Some(Ok(store)) => Some(store),
-        None => None,
-    };
+    let zarr_store =
+        match zarr_path.map(|path| initialize_zarr(path, &celltypes, shape, chunk_size, (m, n))) {
+            Some(Err(e)) => return Err(e),
+            Some(Ok(store)) => Some(store),
+            None => None,
+        };
 
     let celltyping_results = pool.install(|| {
         // generate all chunk indices
@@ -288,7 +289,7 @@ where
             kde_norm.mapv_inplace(F::sqrt);
 
             if let Some(zarr_info) = zarr_info {
-                write_cosine_to_zarr(
+                cosine_similarity_to_zarr(
                     zarr_info.store,
                     &cosine,
                     &kde_norm,
