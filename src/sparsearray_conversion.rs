@@ -29,15 +29,17 @@ fn get_scipy_sparse_attr(py: Python, attr: &str) -> PyResult<PyObject> {
     get_scipy_sparse(py)?.getattr(py, attr)
 }
 
+type CSXTuple<'a, D, I, Iptr> = (
+    Bound<'a, PyArray1<D>>,    //data
+    Bound<'a, PyArray1<I>>,    //indices
+    Bound<'a, PyArray1<Iptr>>, //indexpointer
+);
+
 /// Return a CsMat in SciPy CSX tuple order
 pub fn make_csx_tuple<D, I, Iptr>(
     py: Python<'_>,
     cs: CsMatI<D, I, Iptr>,
-) -> (
-    Bound<'_, PyArray1<D>>,
-    Bound<'_, PyArray1<I>>,
-    Bound<'_, PyArray1<Iptr>>,
-)
+) -> CSXTuple<'_, D, I, Iptr>
 where
     D: Element,
     I: Element + SpIndex,

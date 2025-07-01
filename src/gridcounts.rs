@@ -37,10 +37,13 @@ use std::{
     ops::AddAssign,
 };
 
-/// Class implementation
-
 pub type Count = u32;
 pub type CsxIndex = i32;
+
+type GeneCountsPy = HashMap<String, WrappedCsx<Count, CsxIndex, CsxIndex>>;
+type GeneCountsRs = HashMap<String, CsMatI<Count, CsxIndex, CsxIndex>>;
+
+// Class implementation
 
 #[pyclass(mapping, module = "sainsc")]
 pub struct GridCounts {
@@ -75,7 +78,7 @@ impl GridCounts {
     #[new]
     #[pyo3(signature = (counts, *, resolution=None, n_threads=None))]
     fn new(
-        counts: HashMap<String, WrappedCsx<Count, CsxIndex, CsxIndex>>,
+        counts: GeneCountsPy,
         resolution: Option<f32>,
         n_threads: Option<usize>,
     ) -> PyResult<Self> {
@@ -122,13 +125,7 @@ impl GridCounts {
         fn _from_dataframe(
             mut df: DataFrame,
             binsize: Option<f32>,
-        ) -> Result<
-            (
-                HashMap<String, CsMatI<Count, CsxIndex, CsxIndex>>,
-                (usize, usize),
-            ),
-            PolarsError,
-        > {
+        ) -> Result<(GeneCountsRs, (usize, usize)), PolarsError> {
             fn col_as_nonull_vec<F, T>(
                 df: &DataFrame,
                 col: &str,
@@ -286,12 +283,7 @@ impl GridCounts {
         }
     }
 
-    fn __getnewargs_ex__(
-        &self,
-    ) -> PyResult<(
-        (HashMap<String, WrappedCsx<Count, CsxIndex, CsxIndex>>,),
-        HashMap<String, usize>,
-    )> {
+    fn __getnewargs_ex__(&self) -> PyResult<((GeneCountsPy,), HashMap<String, usize>)> {
         Ok(((HashMap::new(),), HashMap::new()))
     }
 
@@ -502,6 +494,8 @@ impl GridCounts {
         Ok(PyDataFrame(df))
     }
 }
+
+// helper functions
 
 fn first_to_last_range(arr: ArrayView2<'_, bool>, axis: usize) -> (Option<usize>, Option<usize>) {
     let arr_reduced = arr.map_axis(Axis(axis), |ax| ax.iter().any(|&x| x));
