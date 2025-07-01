@@ -187,8 +187,6 @@ where
     I: SpIndex + Signed,
     Slice: From<Range<I>>,
 {
-    let (unpad_r, unpad_c) = unpad;
-
     let mut sufficient_transcripts = true;
     if let Some(min_t) = min_transcripts {
         let n_transcripts: C = counts
@@ -207,7 +205,7 @@ where
         Some((csx, weights)) if sufficient_transcripts => {
             let shape = csx.shape();
             let mut kde = Array2::zeros(shape);
-            let kde_slice = s![unpad_r, unpad_c];
+            let kde_slice = s![unpad.0, unpad.1];
 
             sparse_kde_csx_(&mut kde, &csx, kernel);
 
@@ -242,7 +240,7 @@ where
         }
         // fastpath if all csx are empty or too few transcripts
         _ => {
-            let shape = (unpad_r.end - unpad_r.start, unpad_c.end - unpad_c.start);
+            let shape = (unpad.0.end - unpad.0.start, unpad.1.end - unpad.1.start);
             (
                 (Array2::zeros(shape), Array2::zeros(shape)),
                 Array2::from_elem(shape, -one::<U>()),
