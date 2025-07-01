@@ -207,21 +207,22 @@ where
         Some((csx, weights)) if sufficient_transcripts => {
             let shape = csx.shape();
             let mut kde = Array2::zeros(shape);
+            let kde_slice = s![unpad_r, unpad_c];
 
             sparse_kde_csx_(&mut kde, &csx, kernel);
+
+            let mut kde_unpadded = kde.slice_mut(kde_slice);
             if log {
-                kde.mapv_inplace(F::ln_1p);
+                kde_unpadded.mapv_inplace(F::ln_1p);
             }
 
-            let mut kde_norm = kde
-                .slice(s![unpad_r.clone(), unpad_c.clone()])
-                .map(|k| k.powi(2));
-            let mut cosine: Array3<F> = &kde.slice(s![NewAxis, unpad_r.clone(), unpad_c.clone()])
-                * &weights.slice(s![.., NewAxis, NewAxis]);
+            let mut kde_norm = kde_unpadded.map(|k| k.powi(2));
+            let mut cosine: Array3<F> =
+                &kde_unpadded.slice(s![NewAxis, .., ..]) * &weights.slice(s![.., NewAxis, NewAxis]);
 
             for (csx, weights) in csx_weights_iter {
                 sparse_kde_csx_(&mut kde, &csx, kernel);
-                let mut kde_unpadded = kde.slice_mut(s![unpad_r.clone(), unpad_c.clone()]);
+                let mut kde_unpadded = kde.slice_mut(kde_slice);
                 if log {
                     kde_unpadded.mapv_inplace(F::ln_1p);
                 }
