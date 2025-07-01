@@ -1,9 +1,7 @@
 # sainsc
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Code style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](http://mypy-lang.org/)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 
@@ -49,9 +47,22 @@ This project follows the [SemVer](https://semver.org/) guidelines for versioning
 
 If you are using `sainsc` for your research please cite
 
-Müller-Bötticher, N., Tiesmeyer, S., Eils, R., and Ishaque, N.
-"Sainsc: a computational tool for segmentation-free analysis of in-situ capture"
-bioRxiv (2024) https://doi.org/10.1101/2024.08.02.603879
+N. Müller-Bötticher, S. Tiesmeyer, R. Eils, N. Ishaque, "Sainsc: A Computational Tool
+for Segmentation-Free Analysis of In Situ Capture Data" *Small Methods* (2025)
+https://doi.org/10.1002/smtd.202401123
+
+```
+@article{sainsc2025,
+  author = {Müller-Bötticher, Niklas and Tiesmeyer, Sebastian and Eils, Roland and Ishaque, Naveed},
+  title = {Sainsc: A Computational Tool for Segmentation-Free Analysis of In Situ Capture Data},
+  journal = {Small Methods},
+  year = {2025},
+  volume = {9},
+  number = {5},
+  pages = {2401123},
+  doi = {10.1002/smtd.202401123},
+}
+```
 
 ## License
 

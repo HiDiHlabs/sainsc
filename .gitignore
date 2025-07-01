@@ -1,0 +1,16 @@
+Cargo.lock
+benchmark
+benches
+__pycache__
+debug
+target
+build
+generated
+*.egg-info
+*_cache
+*.so
+apidocs
+dist
+jupyter_execute
+
+settings.json

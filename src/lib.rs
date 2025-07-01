@@ -1,10 +1,10 @@
 mod coordinates;
 mod cosine;
-mod cosine_zarr;
 mod gridcounts;
 mod sparsearray_conversion;
 mod sparsekde;
 mod utils;
+mod zarrstore;
 
 use coordinates::{categorical_coordinate, coordinate_as_string};
 use cosine::{cosinef32_and_celltypei16, cosinef32_and_celltypei8};

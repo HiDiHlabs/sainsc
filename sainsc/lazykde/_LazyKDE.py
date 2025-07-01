@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 from collections.abc import Iterable
-from itertools import chain
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Self, Sequence
+from typing import TYPE_CHECKING, Any, Self, Sequence, TypeVar
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,12 +16,23 @@ from matplotlib.figure import Figure
 from matplotlib.patches import Patch
 from matplotlib_scalebar.scalebar import ScaleBar
 from mpl_toolkits import axes_grid1
-from numba import njit
-from numpy.typing import NDArray
 from scipy.sparse import coo_array, csc_array, csr_array
 from skimage.feature import peak_local_max
 
-from .._typealias import _Cmap, _Csx, _CsxArray, _Local_Max, _PathLike, _RangeTuple2D
+from .._typealias import (
+    _KDE,
+    _AssignmentScoreMap,
+    _Background,
+    _Cmap,
+    _CosineMap,
+    _CountMap,
+    _Csx,
+    _CsxArray,
+    _Kernel,
+    _Local_Max,
+    _PathLike,
+    _RangeTuple2D,
+)
 from .._utils import _raise_module_load_error, _validate_n_threads, validate_threads
 from .._utils_rust import (
     GridCounts,
@@ -33,7 +45,6 @@ from ..utils import gaussian_kernel
 from ._utils import (
     SCALEBAR_PARAMS,
     CosineCelltypeCallable,
-    _apply_color,
     _filter_blobs,
     _get_cell_dtype,
     _load_localmax_cosine,
@@ -77,14 +88,16 @@ class LazyKDE:
         self.counts.n_threads = n_threads
         self._threads = n_threads
 
-        self._kernel: NDArray[np.float32] | None = None
-        self._total_mRNA: NDArray[np.unsignedinteger] | None = None
-        self._total_mRNA_KDE: NDArray[np.float32] | None = None
-        self._background: NDArray[np.bool_] | None = None
+        self._kernel: _Kernel | None = None
+        self._total_mRNA: _CountMap | None = None
+        self._total_mRNA_KDE: _KDE | None = None
+        self._background: _Background | None = None
         self._local_maxima: _Local_Max | None = None
-        self._celltype_map: NDArray[np.signedinteger] | None = None
-        self._cosine_similarity: NDArray[np.float32] | None = None
-        self._assignment_score: NDArray[np.float32] | None = None
+        self._celltype_map: (
+            np.ndarray[tuple[int, int], np.dtype[np.signedinteger]] | None
+        ) = None
+        self._cosine_similarity: _CosineMap | None = None
+        self._assignment_score: _AssignmentScoreMap | None = None
         self._celltypes: list[str] | None = None
 
     @classmethod
@@ -195,7 +208,11 @@ class LazyKDE:
         """
         return self._kde(self.counts[gene], threshold)
 
-    def _kde(self, arr: NDArray | _Csx, threshold: float | None = None) -> _CsxArray:
+    def _kde(
+        self,
+        arr: np.ndarray[tuple[int, int], np.dtype[np.uint32]] | _Csx,
+        threshold: float | None = None,
+    ) -> _CsxArray:
         if self.kernel is None:
             raise ValueError("`kernel` must be set before running KDE")
 
@@ -286,7 +303,7 @@ class LazyKDE:
 
     def load_local_maxima(
         self, genes: Iterable[str] | None = None, *, spatialdata: bool = False
-    ) -> "AnnData | SpatialData":
+    ) -> AnnData | SpatialData:
         """
         Load the gene expression (KDE) of the local maxima.
 
@@ -359,7 +376,6 @@ class LazyKDE:
                 }
 
                 if self.total_mRNA_KDE is not None:
-
                     sdata_dict["total_mRNA"] = Image2DModel.parse(
                         np.atleast_3d(self.total_mRNA_KDE).T, dims=("c", "y", "x")
                     )
@@ -417,7 +433,6 @@ class LazyKDE:
             return adata
 
     def _load_KDE_maxima(self, genes: list[str]) -> csc_array | csr_array:
-
         assert self.local_maxima is not None
         if self.kernel is None:
             raise ValueError("`kernel` must be set before running KDE")
@@ -495,17 +510,15 @@ class LazyKDE:
             If cell type-specific thresholds do not include all cell types or if
             using cell type-specific thresholds before cell type assignment.
         """
+        T = TypeVar("T")
 
-        @njit
         def _map_celltype_to_value(
-            ct_map: NDArray[np.integer], thresholds: tuple[float, ...]
-        ) -> NDArray[np.floating]:
-            values = np.zeros(shape=ct_map.shape, dtype=float)
-            for i in range(ct_map.shape[0]):
-                for j in range(ct_map.shape[1]):
-                    if ct_map[i, j] >= 0:
-                        values[i, j] = thresholds[ct_map[i, j]]
-            return values
+            ct_map: np.ndarray[tuple[int, ...], np.dtype[np.integer]],
+            thresholds: dict[T, float],
+            classes: list[T],
+        ) -> np.ndarray[tuple[int, ...], np.dtype[np.floating]]:
+            ordered_thresholds = np.array([0] + [thresholds[ct] for ct in classes])
+            return np.take(ordered_thresholds, ct_map + 1)
 
         if self.total_mRNA_KDE is None:
             raise ValueError(
@@ -519,8 +532,9 @@ class LazyKDE:
                 )
             elif not all([ct in min_norm.keys() for ct in self.celltypes]):
                 raise ValueError("'min_norm' does not contain all celltypes.")
-            idx2threshold = tuple(min_norm[ct] for ct in self.celltypes)
-            threshold = _map_celltype_to_value(self.celltype_map, idx2threshold)
+            threshold = _map_celltype_to_value(
+                self.celltype_map, min_norm, self.celltypes
+            )
             background = self.total_mRNA_KDE < threshold
         else:
             background = self.total_mRNA_KDE < min_norm
@@ -537,8 +551,9 @@ class LazyKDE:
                     )
                 elif not all([ct in min_cosine.keys() for ct in self.celltypes]):
                     raise ValueError("'min_cosine' does not contain all celltypes.")
-                idx2threshold = tuple(min_cosine[ct] for ct in self.celltypes)
-                threshold = _map_celltype_to_value(self.celltype_map, idx2threshold)
+                threshold = _map_celltype_to_value(
+                    self.celltype_map, min_cosine, self.celltypes
+                )
                 background |= self.cosine_similarity <= threshold
             else:
                 background |= self.cosine_similarity <= min_cosine
@@ -555,13 +570,14 @@ class LazyKDE:
                     )
                 elif not all([ct in min_assignment.keys() for ct in self.celltypes]):
                     raise ValueError("'min_assignment' does not contain all celltypes.")
-                idx2threshold = tuple(min_assignment[ct] for ct in self.celltypes)
-                threshold = _map_celltype_to_value(self.celltype_map, idx2threshold)
+                threshold = _map_celltype_to_value(
+                    self.celltype_map, min_assignment, self.celltypes
+                )
                 background |= self.assignment_score <= threshold
             else:
                 background |= self.assignment_score <= min_assignment
 
-        self._background = background
+        self._background = background  # type: ignore
 
     @staticmethod
     def _calculate_cosine_celltype_fn(dtype) -> CosineCelltypeCallable:
@@ -631,15 +647,13 @@ class LazyKDE:
         celltypes = signatures.columns.tolist()
         ct_dtype = _get_cell_dtype(len(celltypes))
 
-        zarr_path = None if zarr_path is None else Path(zarr_path)
-
-        if zarr_path is not None and any(
-            char in ct for char in ILLEGAL_CHARS for ct in celltypes
-        ):
-            raise ValueError(
-                "Celltype names contain at least one of the illegal characters: "
-                f"{ILLEGAL_CHARS}"
-            )
+        if zarr_path is not None:
+            zarr_path = Path(zarr_path)
+            if any(char in ct for char in ILLEGAL_CHARS for ct in celltypes):
+                raise ValueError(
+                    "Celltype names contain at least one of the illegal characters: "
+                    f"{ILLEGAL_CHARS}"
+                )
 
         # scale signatures to unit norm
         signatures_mat = signatures.to_numpy()
@@ -667,7 +681,7 @@ class LazyKDE:
     ## Plotting
     def _plot_2d(
         self,
-        img: NDArray,
+        img: np.ndarray[tuple[int, int], np.dtype],
         title: str,
         *,
         remove_background: bool = False,
@@ -684,7 +698,7 @@ class LazyKDE:
                 raise ValueError("`background` is undefined")
 
         if crop is not None:
-            img = img[tuple(slice(*c) for c in crop)]
+            img = img[tuple(slice(*c) for c in crop)]  # type: ignore
         fig, ax = plt.subplots(1, 1)
         assert isinstance(ax, Axes)
         im = ax.imshow(img.T, origin="lower", **im_kwargs)
@@ -950,8 +964,8 @@ class LazyKDE:
             x_min, x_max = crop[0]
             y_min, y_max = crop[1]
             keep = (x >= x_min) & (y >= y_min) & (x < x_max) & (y < y_max)
-            x = x[keep] - x_min
-            y = y[keep] - y_min
+            x = x[keep] - x_min  # type: ignore
+            y = y[keep] - y_min  # type: ignore
 
         fig = self.plot_KDE(crop=crop, **background_kwargs)
         fig.axes[0].scatter(x, y, **scatter_kwargs)
@@ -968,7 +982,7 @@ class LazyKDE:
         undefined: str | tuple = "grey",
         scalebar_kwargs: dict = SCALEBAR_PARAMS,
         return_img: bool = False,
-    ) -> Figure | NDArray[np.uint8]:
+    ) -> Figure | np.ndarray[tuple[int, int], np.dtype[np.uint8]]:
         """
         Plot the cell-type annotation.
 
@@ -1021,7 +1035,7 @@ class LazyKDE:
                 celltype_map[self.background] = -1
 
         if crop is not None:
-            celltype_map = celltype_map[tuple(slice(*c) for c in crop)]
+            celltype_map = celltype_map[tuple(slice(*c) for c in crop)]  # type: ignore
 
         # shift so 0 will be background
         celltype_map += 1
@@ -1040,11 +1054,11 @@ class LazyKDE:
             color_map = [to_rgb(c) if isinstance(c, str) else c for c in cmap]
 
         # convert to uint8 to reduce memory of final image
-        color_map_int = tuple(
-            (np.array(c) * 255).round().astype(np.uint8)
-            for c in chain([to_rgb(background)], color_map)
+        color_map_int = (
+            (np.array([to_rgb(background)] + color_map) * 255).round().astype(np.uint8)
         )
-        img = _apply_color(celltype_map.T, color_map_int)
+
+        img = np.take(color_map_int, celltype_map.T, axis=0)
 
         if return_img:
             return img
@@ -1212,9 +1226,9 @@ class LazyKDE:
         self.counts.resolution = resolution
 
     @property
-    def kernel(self) -> np.ndarray | None:
+    def kernel(self) -> np.ndarray[tuple[int, int], np.dtype[np.float32]] | None:
         """
-        numpy.ndarray: Map of the KDE of total mRNA.
+        numpy.ndarray[tuple[int, int], numpy.float32]: Map of the KDE of total mRNA.
 
         Raises
         ------
@@ -1224,7 +1238,7 @@ class LazyKDE:
         return self._kernel
 
     @kernel.setter
-    def kernel(self, kernel: np.ndarray):
+    def kernel(self, kernel: np.ndarray[tuple[int, int], np.dtype[np.float32]]):
         if (
             len(kernel.shape) != 2
             or kernel.shape[0] != kernel.shape[1]
@@ -1237,30 +1251,40 @@ class LazyKDE:
             self._kernel = kernel.astype(np.float32)
 
     @property
-    def local_maxima(self) -> _Local_Max | None:
+    def local_maxima(
+        self,
+    ) -> (
+        tuple[
+            np.ndarray[tuple[int], np.dtype[np.int_]],
+            np.ndarray[tuple[int], np.dtype[np.int_]],
+        ]
+        | None
+    ):
         """
         tuple[numpy.ndarray[numpy.signedinteger], ...]: Coordinates of local maxima.
         """
         return self._local_maxima
 
     @property
-    def total_mRNA(self) -> NDArray[np.unsignedinteger] | None:
+    def total_mRNA(
+        self,
+    ) -> np.ndarray[tuple[int, int], np.dtype[np.unsignedinteger]] | None:
         """
-        numpy.ndarray[numpy.unsignedinteger]: Map of the total mRNA.
+        numpy.ndarray[tuple[int, int], numpy.unsignedinteger]: Map of the total mRNA.
         """
         return self._total_mRNA
 
     @property
-    def total_mRNA_KDE(self) -> NDArray[np.single] | None:
+    def total_mRNA_KDE(self) -> np.ndarray[tuple[int, int], np.dtype[np.single]] | None:
         """
-        numpy.ndarray[numpy.single]: Map of the KDE of total mRNA.
+        numpy.ndarray[tuple[int, int], numpy.single]: Map of the KDE of total mRNA.
         """
         return self._total_mRNA_KDE
 
     @property
-    def background(self) -> NDArray[np.bool_] | None:
+    def background(self) -> np.ndarray[tuple[int, int], np.dtype[np.bool_]] | None:
         """
-        numpy.ndarray[numpy.bool]: Map of pixels that are assigned as background.
+        numpy.ndarray[tuple[int, int], numpy.bool]: Map of pixels that are assigned as background.
 
         Raises
         ------
@@ -1272,7 +1296,7 @@ class LazyKDE:
         return self._background
 
     @background.setter
-    def background(self, background: NDArray[np.bool_]):
+    def background(self, background: _Background):
         if background.shape != self.shape:
             raise ValueError("`background` must have same shape as `self`")
         else:
@@ -1286,16 +1310,20 @@ class LazyKDE:
         return self._celltypes
 
     @property
-    def cosine_similarity(self) -> NDArray[np.single] | None:
+    def cosine_similarity(
+        self,
+    ) -> np.ndarray[tuple[int, int], np.dtype[np.float32]] | None:
         """
-        numpy.ndarray[numpy.single]: Cosine similarity for each pixel.
+        numpy.ndarray[tuple[int, int], numpy.single]: Cosine similarity for each pixel.
         """
         return self._cosine_similarity
 
     @property
-    def assignment_score(self) -> NDArray[np.single] | None:
+    def assignment_score(
+        self,
+    ) -> np.ndarray[tuple[int, int], np.dtype[np.float32]] | None:
         """
-        numpy.ndarray[numpy.single]: Assignment score for each pixel.
+        numpy.ndarray[tuple[int, int], numpy.single]: Assignment score for each pixel.
 
         Let `x` be the gene expression of a pixel, and `i` and `j` the signatures of the
         best and 2nd best scoring cell type, respectively. The assignment score is
@@ -1305,9 +1333,11 @@ class LazyKDE:
         return self._assignment_score
 
     @property
-    def celltype_map(self) -> NDArray[np.signedinteger] | None:
+    def celltype_map(
+        self,
+    ) -> np.ndarray[tuple[int, int], np.dtype[np.signedinteger]] | None:
         """
-        numpy.ndarray[numpy.signedinteger]: Cell-type map of cell-type indices.
+        numpy.ndarray[tuple[int, int], numpy.signedinteger]: Cell-type map of cell-type indices.
 
         Each number corresponds to the index in :py:attr:`sainsc.LazyKDE.celltypes`,
         and -1 to unassigned (background).

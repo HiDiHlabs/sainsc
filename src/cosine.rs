@@ -1,8 +1,7 @@
-use crate::cosine_zarr::{initialize_cosine_zarrstore, write_cosine_to_zarr, ZarrChunkInfo};
 use crate::gridcounts::GridCounts;
 use crate::sparsekde::sparse_kde_csx_;
 use crate::utils::create_pool;
-
+use crate::zarrstore::{initialize_cosine_zarrstore, write_cosine_to_zarr, ZarrChunkInfo};
 use itertools::Itertools;
 use ndarray::{
     concatenate, s, Array2, Array3, ArrayView1, ArrayView2, Axis, NdFloat, NewAxis, ShapeError,
@@ -24,12 +23,10 @@ macro_rules! build_cos_ct_fn {
         pub fn $name<'py>(
             py: Python<'py>,
             counts: &mut GridCounts,
-            genes: Vec<String>,
-            celltypes: Vec<String>,
+            genes: Vec<String>,celltypes: Vec<String>,
             signatures: PyReadonlyArray2<'py, $t_cos>,
             kernel: PyReadonlyArray2<'py, $t_cos>,
-            log: bool,
-            zarr_path:Option<PathBuf>,
+            log: bool,zarr_path:Option<PathBuf>,
             chunk_size: (usize, usize),
             n_threads: Option<usize>,
         ) -> PyResult<(
@@ -49,22 +46,20 @@ macro_rules! build_cos_ct_fn {
                 .collect::<Result<_, _>>()?;
 
             let cos_ct = chunk_and_calculate_cosine(
-                &gene_counts,
-                celltypes,
+                &gene_counts,celltypes,
                 signatures.as_array(),
                 kernel.as_array(),
                 counts.shape,
-                log,
-                zarr_path,
+                log,zarr_path,
                 chunk_size,
                 n_threads
             );
 
             match cos_ct {
                 Ok((cosine, score, celltype_map)) => Ok((
-                    cosine.into_pyarray_bound(py),
-                    score.into_pyarray_bound(py),
-                    celltype_map.into_pyarray_bound(py),
+                    cosine.into_pyarray(py),
+                    score.into_pyarray(py),
+                    celltype_map.into_pyarray(py),
                 )),
                 Err(e) => Err(PyValueError::new_err(e.to_string())),
             }
@@ -141,13 +136,13 @@ where
             .into_par_iter()
             .map(|idx| {
                 let (chunk, unpad) = get_chunk(counts, idx, shape, chunk_size, pad);
-
                 let zarr_info = zarr_store.clone().map(|store| ZarrChunkInfo {
                     store,
+
                     celltypes: { celltypes.clone() },
+
                     chunk_idx: vec![idx.0 as u64, idx.1 as u64],
                 });
-
                 cosine_and_celltype_(
                     chunk,
                     signatures,
@@ -290,7 +285,6 @@ where
                     .filter(|(_, &w)| w != zero::<F>())
                     .for_each(|(mut cos, &w)| cos += &kde_unpadded.map(|&x| x * w));
             }
-
             kde_norm.mapv_inplace(F::sqrt);
 
             if let Some(zarr_info) = zarr_info {
@@ -336,6 +330,7 @@ where
                 *s = zero();
             } else {
                 *cos /= norm;
+
                 *s /= norm;
             };
         });

@@ -10,6 +10,7 @@ from ._io import (
     read_gem_header,
     read_StereoSeq,
     read_StereoSeq_bins,
+    read_VisiumHD,
     read_Vizgen,
     read_Xenium,
 )
@@ -21,6 +22,7 @@ __all__ = [
     "read_gem_header",
     "read_StereoSeq",
     "read_StereoSeq_bins",
+    "read_VisiumHD",
     "read_Vizgen",
     "read_Xenium",
 ]

@@ -1,20 +1,20 @@
-from collections.abc import Callable
+from collections.abc import Hashable
 
 import anndata as ad
+import numpy as np
 import pandas as pd
+from numpy.typing import DTypeLike
 
 
 def celltype_signatures(
     adata: ad.AnnData,
     *,
     celltype_col: str = "leiden",
-    agg_method: str | Callable = "mean",
+    layer: str | None = None,
+    dtype: DTypeLike = np.float32,
 ) -> pd.DataFrame:
     """
-    Calculate gene expression signatures per 'celltype'.
-
-    Note, that this will make a dense copy of `adata.X` therefore potentially leading
-    to large memory usage.
+    Calculate gene expression signatures per 'cell type'.
 
     Parameters
     ----------
@@ -22,24 +22,25 @@ def celltype_signatures(
     celltype_col : str, optional
         Name of column in :py:attr:`anndata.AnnData.obs` containing cell-type
         information.
-    agg_method : str or collections.abc.Callable, optional
-        Function to aggregate gene expression per cluster used by
-        :py:meth:`pandas.DataFrame.agg`.
+    layer : str, optional
+        Which :py:attr:`anndata.AnnData.layers` to use for aggregation. If `None`,
+        :py:attr:`anndata.AnnData.X` is used.
+    dytpe : numpy.typing.DTypeLike
+        Data type to use for the signatures.
 
     Returns
     -------
     pandas.DataFrame
-        :py:class:`pandas.DataFrame` of gene expression aggregated per 'celltype'.
+        :py:class:`pandas.DataFrame` of gene expression aggregated per 'cell type'.
     """
-    signatures = (
-        adata.to_df()
-        .merge(adata.obs[celltype_col], left_index=True, right_index=True)
-        .groupby(celltype_col, observed=True, sort=False)
-        .agg(agg_method)
-        .transpose()
-        .rename_axis(adata.var_names.name)
-    )
+    X = adata.X if layer is None else adata.layers[layer]
+    grouping = adata.obs.groupby(celltype_col, observed=True, sort=False).indices
 
-    signatures /= signatures.sum(axis=0)
+    signatures: dict[Hashable, np.ndarray] = {}
+    for name, indices in grouping.items():
+        mean_X_group = X[indices].mean(axis=0, dtype=dtype)
+        signatures[name] = (
+            mean_X_group.A1 if isinstance(mean_X_group, np.matrix) else mean_X_group
+        )
 
-    return signatures
+    return pd.DataFrame(signatures, index=adata.var_names)

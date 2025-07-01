@@ -6,38 +6,36 @@ import numpy as np
 import pandas as pd
 import zarr
 from anndata import AnnData
-from numba import njit
 from numpy.typing import NDArray
 from scipy.sparse import csr_matrix, sparray, spmatrix
 from skimage.measure import label, regionprops
 
-from .._typealias import _Local_Max, _PathLike
+from .._typealias import (
+    _AssignmentScoreMap,
+    _CosineMap,
+    _Kernel,
+    _Local_Max,
+    _PathLike,
+    _SignatureArray,
+)
 from .._utils import _get_coordinate_index
 from .._utils_rust import GridCounts
 
-T = TypeVar("T", bound=np.number)
 U = TypeVar("U", bound=np.bool_ | np.integer)
+N = TypeVar("N", bound=int)
+_Shape = TypeVar("_Shape", bound=tuple[int, ...])
 
-SCALEBAR_PARAMS = dict(box_alpha=0, color="w")
+SCALEBAR_PARAMS = dict(frameon=False, color="w")
 """Default scalebar parameters"""
 
 
-@njit
-def _apply_color(
-    img_in: NDArray[np.integer], cmap: tuple[NDArray[T], ...]
-) -> NDArray[T]:
-    img = np.empty(shape=(*img_in.shape, 3), dtype=cmap[0].dtype)
-    for i in range(img_in.shape[0]):
-        for j in range(img_in.shape[1]):
-            img[i, j, :] = cmap[img_in[i, j]]
-    return img
+def _get_cell_dtype(n: int) -> np.dtype[np.signedinteger]:
+    return np.result_type(np.int8, n)
 
 
-def _get_cell_dtype(n: int) -> np.dtype:
-    return np.result_type("int8", n)
-
-
-def _filter_blobs(labeled_map: NDArray[U], min_blob_area: int) -> NDArray[U]:
+def _filter_blobs(
+    labeled_map: np.ndarray[_Shape, np.dtype[U]], min_blob_area: int
+) -> np.ndarray[_Shape, np.dtype[U]]:
     # remove small blops (i.e. "cells")
     if min_blob_area <= 0:
         raise ValueError("Area must be bigger than 0")
@@ -52,7 +50,7 @@ def _filter_blobs(labeled_map: NDArray[U], min_blob_area: int) -> NDArray[U]:
 def _localmax_anndata(
     kde: spmatrix | sparray | NDArray,
     genelist: Iterable[str],
-    coord: tuple[NDArray[np.integer], ...],
+    coord: tuple[np.ndarray[tuple[N], np.dtype[np.integer]], ...],
     *,
     name: str | None = None,
     n_threads: int = 1,
@@ -97,11 +95,15 @@ class CosineCelltypeCallable(Protocol):
         counts: GridCounts,
         genes: list[str],
         celltypes: list[str],
-        signatures: NDArray[np.float32],
-        kernel: NDArray[np.float32],
+        signatures: _SignatureArray,
+        kernel: _Kernel,
         *,
         log: bool = ...,
         zarr_path: Path | None = None,
         chunk_size: tuple[int, int] = ...,
         n_threads: int | None = ...,
-    ) -> tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.signedinteger]]: ...
+    ) -> tuple[
+        _CosineMap,
+        _AssignmentScoreMap,
+        np.ndarray[tuple[int, int], np.dtype[np.signedinteger]],
+    ]: ...
