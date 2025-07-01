@@ -2,7 +2,7 @@ use crate::sparsearray_conversion::WrappedCsx;
 use crate::utils::create_pool;
 use bincode::{deserialize, serialize};
 use itertools::Itertools;
-use ndarray::Array2;
+use ndarray::{Array2, ArrayView2, Axis};
 use num::Zero;
 use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
 use polars::{
@@ -438,7 +438,8 @@ impl GridCounts {
         Ok(())
     }
 
-    fn filter_mask(&mut self, mask: PyReadonlyArray2<'_, bool>) {
+    #[pyo3(signature = (mask, *, crop=true))]
+    fn filter_mask(&mut self, mask: PyReadonlyArray2<'_, bool>, crop: bool) -> PyResult<()> {
         let mask = mask.as_array();
 
         self.threadpool.install(|| {
@@ -452,6 +453,15 @@ impl GridCounts {
                 *mat = TriMatI::from_triplets(self.shape, x, y, data).to_csr();
             });
         });
+
+        if crop {
+            let row_range = first_to_last_range(mask, 1);
+            let col_range = first_to_last_range(mask, 0);
+
+            self.crop(col_range, row_range)
+        } else {
+            Ok(())
+        }
     }
 
     fn as_dataframe(&mut self) -> PyResult<PyDataFrame> {
@@ -491,4 +501,12 @@ impl GridCounts {
 
         Ok(PyDataFrame(df))
     }
+}
+
+fn first_to_last_range(arr: ArrayView2<'_, bool>, axis: usize) -> (Option<usize>, Option<usize>) {
+    let arr_reduced = arr.map_axis(Axis(axis), |ax| ax.iter().any(|&x| x));
+    (
+        arr_reduced.iter().position(|&x| x),
+        arr_reduced.iter().rposition(|&x| x).map(|i| i + 1),
+    )
 }
