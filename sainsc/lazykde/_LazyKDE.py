@@ -341,6 +341,9 @@ class LazyKDE:
         )
 
         if spatialdata:
+            raise NotImplementedError(
+                "Currently not implemented due to dependency conflicts of the supported zarr version"
+            )
             try:
                 from spatialdata import SpatialData
                 from spatialdata.models import (

@@ -544,6 +544,9 @@ def read_StereoSeq_bins(
     )
 
     if spatialdata:
+        raise NotImplementedError(
+            "Currently not implemented due to dependency conflicts of the supported zarr version"
+        )
         try:
             from geopandas import GeoDataFrame
             from shapely import Polygon

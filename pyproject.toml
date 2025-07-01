@@ -41,7 +41,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-spatialdata = ["spatialdata>=0.1"]
+# spatialdata = ["spatialdata>=0.1"]
 docs = [
     "sphinx",
     "sphinx-autoapi>=3.1",
@@ -50,7 +50,7 @@ docs = [
     "myst-nb",
 ]
 data = ["pooch>=1"]
-dev = ["sainsc[data,docs,spatialdata]", "pre-commit"]
+dev = ["sainsc[data,docs]", "pre-commit"]
 
 [project.urls]
 Homepage      = "https://github.com/HiDiHlabs/sainsc"
