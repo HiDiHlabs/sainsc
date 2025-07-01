@@ -1,7 +1,9 @@
 use crate::gridcounts::GridCounts;
 use crate::sparsekde::sparse_kde_csx_;
 use crate::utils::create_pool;
-use crate::zarrstore::{cosine_similarity_to_zarr, initialize_zarr, ZarrChunkInfo};
+use crate::zarrstore::{
+    cosine_similarity_to_zarr, initialize_zarr, signature_correction_to_zarr, ZarrChunkInfo,
+};
 use itertools::Itertools;
 use ndarray::{
     concatenate, s, Array2, Array3, ArrayView1, ArrayView2, Axis, NdFloat, NewAxis, ShapeError,
@@ -121,12 +123,14 @@ where
         });
 
     // init zarr store for celltypes with chunksize and all zero arrays
-    let zarr_store =
-        match zarr_path.map(|path| initialize_zarr(path, &celltypes, shape, chunk_size, (m, n))) {
-            Some(Err(e)) => return Err(e),
-            Some(Ok(store)) => Some(store),
-            None => None,
-        };
+    // and write the similarity correction to the store
+    let zarr_store = zarr_path
+        .map(|path| {
+            let store = initialize_zarr(path, &celltypes, shape, chunk_size, (m, n))?;
+            signature_correction_to_zarr(store.clone(), &signature_similarity_correction)?;
+            Ok::<_, Box<dyn Error + Send + Sync>>(store)
+        })
+        .transpose()?;
 
     let celltyping_results = pool.install(|| {
         // generate all chunk indices

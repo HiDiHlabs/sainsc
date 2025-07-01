@@ -3,13 +3,17 @@ use num::zero;
 use serde_json::Map;
 use std::{error::Error, path::PathBuf, sync::Arc};
 use zarrs::{
-    array::{codec::GzipCodec, Array as ZarrArray, ArrayBuilder, DataType, Element, FillValue},
+    array::{
+        codec::GzipCodec, Array as ZarrArray, ArrayBuilder, DataType, Element, FillValue,
+        ZARR_NAN_F32,
+    },
     filesystem::FilesystemStore,
     group::{Group, GroupBuilder, GroupMetadataV3},
 };
 
-const CT_PATH_PREFIX: &str = "/cosine_similarity";
-const KDE_PATH: &str = "/kde_l2";
+const MODALITY: &str = "gene_expression";
+const CT_PATH: &str = "cosine_similarity";
+const KDE_PATH: &str = "kde_l2";
 
 pub struct ZarrChunkInfo {
     pub store: Arc<FilesystemStore>,
@@ -43,9 +47,11 @@ pub fn initialize_zarr(
     )?
     .store_metadata()?;
 
-    // generate cosine group
+    let ct_prefix = format!("/{MODALITY}/{CT_PATH}");
+
+    // generate cosine similarity group
     GroupBuilder::new()
-        .build(store.clone(), CT_PATH_PREFIX)?
+        .build(store.clone(), &ct_prefix)?
         .store_metadata()?;
 
     let mut array_builder = ArrayBuilder::new(
@@ -60,12 +66,12 @@ pub fn initialize_zarr(
 
     // generate empty arrays for celltypes
     for ct in celltypes {
-        let ct_array = array_builder.build(store.clone(), &format!("{CT_PATH_PREFIX}/{ct}"))?;
+        let ct_array = array_builder.build(store.clone(), &format!("{ct_prefix}/{ct}"))?;
         ct_array.store_metadata()?;
     }
 
     // generate empty array for kde
-    let kde_array = array_builder.build(store.clone(), KDE_PATH)?;
+    let kde_array = array_builder.build(store.clone(), &format!("/{MODALITY}/{KDE_PATH}"))?;
     kde_array.store_metadata()?;
 
     Ok(store)
@@ -83,19 +89,44 @@ pub fn cosine_similarity_to_zarr<T: NdFloat + Element>(
     // have the exact same size
     // therefore using store_chunk_subset_ndarray
 
+    let ct_prefix = format!("/{MODALITY}/{CT_PATH}");
+
     for (cos, ct) in cosine.outer_iter().zip(celltypes) {
         let mut cos_norm = &cos / kde_norm;
         cos_norm.mapv_inplace(|v| if v.is_nan() { zero() } else { v });
 
-        ZarrArray::open(zarr_store.clone(), &format!("{CT_PATH_PREFIX}/{ct}"))?
+        ZarrArray::open(zarr_store.clone(), &format!("{ct_prefix}/{ct}"))?
             .store_chunk_subset_ndarray(chunk_idx, &[0, 0], cos_norm)?;
     }
 
-    ZarrArray::open(zarr_store.clone(), KDE_PATH)?.store_chunk_subset_ndarray(
-        chunk_idx,
-        &[0, 0],
-        kde_norm.to_owned(),
-    )?;
+    ZarrArray::open(zarr_store.clone(), &format!("/{MODALITY}/{KDE_PATH}"))?
+        .store_chunk_subset_ndarray(chunk_idx, &[0, 0], kde_norm.to_owned())?;
+
+    Ok(())
+}
+
+pub fn signature_correction_to_zarr<T: NdFloat + Element>(
+    zarr_store: Arc<FilesystemStore>,
+    correction: &Array2<T>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let shape: Vec<_> = correction.shape().iter().map(|&x| x as _).collect();
+
+    let mut array_builder = ArrayBuilder::new(
+        shape.clone(),
+        DataType::Float32,
+        shape.try_into()?,
+        FillValue::from(ZARR_NAN_F32),
+    );
+
+    let array = array_builder
+        .bytes_to_bytes_codecs(vec![Arc::new(GzipCodec::new(5)?)])
+        .dimension_names(["celltype1", "celltype2"].into())
+        .build(
+            zarr_store.clone(),
+            &format!("/{MODALITY}/signature_correction"),
+        )?;
+    array.store_metadata()?;
+    array.store_array_subset_ndarray(&[0, 0], correction.to_owned())?;
 
     Ok(())
 }
