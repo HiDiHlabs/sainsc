@@ -90,12 +90,8 @@ where
 {
     let pool = create_pool(n_threads)?;
 
-    let kernelsize = kernel.shape();
-
-    let (nrow, ncol) = shape;
-    let (srow, scol) = chunk_size;
-    let pad = ((kernelsize[0] - 1) / 2, (kernelsize[1] - 1) / 2);
-    let (m, n) = (nrow.div_ceil(srow), ncol.div_ceil(scol)); // number of chunks
+    let pad = get_padding(kernel.shape());
+    let (m, n) = n_chunks(shape, chunk_size); // number of chunks
 
     let signature_similarity_correction = similarity_correction(&signatures);
 
@@ -128,6 +124,16 @@ where
         concat_2d(&score, n)?,
         concat_2d(&celltype, n)?,
     ))
+}
+
+fn n_chunks(shape: (usize, usize), chunk_shape: (usize, usize)) -> (usize, usize) {
+    let (nrow, ncol) = shape;
+    let (srow, scol) = chunk_shape;
+    (nrow.div_ceil(srow), ncol.div_ceil(scol))
+}
+
+fn get_padding(shape: &[usize]) -> (usize, usize) {
+    ((shape[0] - 1) / 2, (shape[1] - 1) / 2)
 }
 
 fn similarity_correction<T: NdFloat>(arr: &ArrayView2<T>) -> Array2<T> {
