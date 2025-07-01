@@ -70,15 +70,17 @@ def _localmax_anndata(
 def _load_localmax_cosine(
     coord: _Local_Max, zarr_store: _PathLike, *, celltypes: Sequence[str] | None = None
 ) -> AnnData:
-    cosine_group = zarr.open_group(store=zarr_store, mode="r", path="cosine")
+    cs_group = zarr.open_group(
+        store=zarr_store, mode="r", path="/gene_expression/cosine_similarity"
+    )
 
     if celltypes is None:
-        celltypes = sorted(cosine_group.array_keys())
-    elif not all(ct in cosine_group.array_keys() for ct in celltypes):
+        celltypes = sorted(cs_group.array_keys())
+    elif not all(ct in cs_group.array_keys() for ct in celltypes):
         raise ValueError("Not all `celltypes` are available.")
 
     cosine = np.column_stack(
-        [cosine_group[ct].get_coordinate_selection(coord) for ct in celltypes]
+        [cs_group[ct].get_coordinate_selection(coord) for ct in celltypes]
     )
 
     obs = pd.DataFrame(

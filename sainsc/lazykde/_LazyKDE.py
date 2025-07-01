@@ -464,7 +464,7 @@ class LazyKDE:
         -------
         anndata.AnnData
         """
-        # Celltype assignment must have beenn run so the following attributesshoul exist
+        # Celltype assignment must have been run so the following attributes should exist
         assert self.local_maxima is not None
         assert self.celltypes is not None
         assert self.celltype_map is not None
