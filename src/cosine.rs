@@ -235,6 +235,7 @@ where
                     .filter(|(_, &w)| w != zero::<F>())
                     .for_each(|(mut cos, &w)| cos += &kde_unpadded.map(|&x| x * w));
             }
+            kde_norm.mapv_inplace(F::sqrt);
             // TODO: write to zarr
             get_max_cosine_and_celltype(cosine, kde_norm, pairwise_correction)
         }
@@ -242,7 +243,10 @@ where
         _ => {
             let shape = (unpad.0.end - unpad.0.start, unpad.1.end - unpad.1.start);
             (
-                (Array2::zeros(shape), Array2::zeros(shape)),
+                (
+                    Array2::from_elem(shape, F::nan()),
+                    Array2::from_elem(shape, F::nan()),
+                ),
                 Array2::from_elem(shape, -one::<U>()),
             )
         }
@@ -261,35 +265,23 @@ where
     let vars = cosine.map_axis(Axis(0), |view| get_argmax2(view, pairwise_correction));
     let mut max_cosine = vars.mapv(|(c, _, _)| c);
     let mut score = vars.mapv(|(_, s, _)| s);
-    let mut celltypemap = vars.mapv(|(_, _, i)| I::from(i).unwrap());
+    let celltypemap = vars.mapv(|(_, _, i)| i);
 
-    Zip::from(&mut celltypemap)
-        .and(&mut max_cosine)
-        .and(&mut score)
-        .and(&kde_norm)
-        .for_each(|ct, cos, s, &norm| {
-            if norm == zero() {
-                *ct = -one::<I>();
-                *s = zero();
-            } else {
-                let norm_sqrt = norm.sqrt();
-                *cos /= norm_sqrt;
-                *s /= norm_sqrt;
-            };
-        });
+    max_cosine /= &kde_norm;
+    score /= &kde_norm;
 
     ((max_cosine, score), celltypemap)
 }
 
-fn get_argmax2<T: NdFloat>(
+fn get_argmax2<T: NdFloat, I: Signed + PrimInt>(
     values: ArrayView1<T>,
     pairwise_correction: &Array2<T>,
-) -> (T, T, usize) {
+) -> (T, T, I) {
     let mut max = zero();
     let mut max2 = zero();
 
-    let mut argmax = 0;
-    let mut argmax2 = 0;
+    let mut argmax = -one::<I>();
+    let mut argmax2 = -one::<I>();
 
     for (i, &val) in values.indexed_iter() {
         if val > max2 {
@@ -297,14 +289,23 @@ fn get_argmax2<T: NdFloat>(
                 max2 = max;
                 max = val;
                 argmax2 = argmax;
-                argmax = i;
+                argmax = I::from(i).expect("correct type must be selected beforehand");
             } else {
                 max2 = val;
-                argmax2 = i;
+                argmax2 = I::from(i).expect("correct type must be selected beforehand");
             }
         }
     }
-    let score = (max - max2) / pairwise_correction[[argmax, argmax2]];
+    let score = if (argmax >= zero()) & (argmax2 >= zero()) {
+        let i = argmax.to_usize().expect("non-negative");
+        let j = argmax2.to_usize().expect("non-negative");
+
+        (max - max2) / pairwise_correction[[i, j]]
+    } else {
+        // TODO: what to return if only one signature is non-zero, what would the c
+        // orrection-factor be, the max of the row?
+        T::nan()
+    };
     (max, score, argmax)
 }
 

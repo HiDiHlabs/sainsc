@@ -508,6 +508,8 @@ class LazyKDE:
                 raise ValueError(
                     "Cosine similarity threshold can only be used after cell-type assignment"
                 )
+
+            isnan_cs = np.isnan(self.cosine_similarity)
             if isinstance(min_cosine, dict):
                 if self.celltypes is None or self.celltype_map is None:
                     raise ValueError(
@@ -518,15 +520,17 @@ class LazyKDE:
                 threshold = _map_celltype_to_value(
                     self.celltype_map, min_cosine, self.celltypes
                 )
-                background |= self.cosine_similarity <= threshold
+                background |= (self.cosine_similarity <= threshold) | isnan_cs
             else:
-                background |= self.cosine_similarity <= min_cosine
+                background |= (self.cosine_similarity <= min_cosine) | isnan_cs
 
         if min_assignment is not None:
             if self.assignment_score is None:
                 raise ValueError(
                     "Assignment score threshold can only be used after cell-type assignment"
                 )
+
+            isnan_as = np.isnan(self.assignment_score)
             if isinstance(min_assignment, dict):
                 if self.celltypes is None or self.celltype_map is None:
                     raise ValueError(
@@ -537,9 +541,9 @@ class LazyKDE:
                 threshold = _map_celltype_to_value(
                     self.celltype_map, min_assignment, self.celltypes
                 )
-                background |= self.assignment_score <= threshold
+                background |= (self.assignment_score <= threshold) | isnan_as
             else:
-                background |= self.assignment_score <= min_assignment
+                background |= (self.assignment_score <= min_assignment) | isnan_as
 
         self._background = background  # type: ignore
 
@@ -634,16 +638,16 @@ class LazyKDE:
         img: np.ndarray[tuple[int, int], np.dtype],
         title: str,
         *,
-        remove_background: bool = False,
+        background=None,
         crop: _RangeTuple2D | None = None,
         scalebar: bool = True,
         im_kwargs: dict = dict(),
         scalebar_kwargs: dict = SCALEBAR_PARAMS,
     ) -> Figure:
-        if remove_background:
+        if background is not None:
             if self.background is not None:
                 img = img.copy()
-                img[self.background] = 0
+                img[self.background] = background
             else:
                 raise ValueError("`background` is undefined")
 
@@ -871,7 +875,7 @@ class LazyKDE:
         return self._plot_2d(
             img,
             title,
-            remove_background=remove_background,
+            background=0 if remove_background else None,
             crop=crop,
             scalebar=scalebar,
             im_kwargs=im_kwargs,
@@ -1071,7 +1075,7 @@ class LazyKDE:
             return self._plot_2d(
                 self.cosine_similarity,
                 "Cosine similarity",
-                remove_background=remove_background,
+                background=np.nan if remove_background else None,
                 crop=crop,
                 scalebar=scalebar,
                 im_kwargs=im_kwargs,
@@ -1118,7 +1122,7 @@ class LazyKDE:
             return self._plot_2d(
                 self.assignment_score,
                 "Assignment score",
-                remove_background=remove_background,
+                background=np.nan if remove_background else None,
                 crop=crop,
                 scalebar=scalebar,
                 im_kwargs=im_kwargs,
