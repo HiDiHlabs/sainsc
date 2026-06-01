@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 from anndata import AnnData
-from scipy.sparse import csc_array, csr_matrix
+from scipy.sparse import csc_array, csr_array
 
 from .._typealias import _PathLike
 from .._utils import _get_coordinate_index, _raise_module_load_error, validate_threads
@@ -513,7 +513,7 @@ def read_StereoSeq_bins(
     genes = pd.DataFrame(index=pd.Index(df["gene"].cat.get_categories(), name="gene"))
 
     # Duplicate entries in csr_matrix are summed which automatically gives bin merging
-    counts = csr_matrix(
+    counts = csr_array(
         (df["count"], (coord_codes, df["gene"].to_physical())),
         shape=(coordinates.shape[0], df["gene"].cat.get_categories().shape[0]),
         dtype=np.int32,

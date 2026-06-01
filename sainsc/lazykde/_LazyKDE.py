@@ -400,7 +400,7 @@ class LazyKDE:
                         instance_key="instance_key",
                     )
 
-                return SpatialData.from_elements_dict(sdata_dict)
+                return SpatialData.init_from_elements(sdata_dict)
 
             except ModuleNotFoundError as e:
                 _raise_module_load_error(

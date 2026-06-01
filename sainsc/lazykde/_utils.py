@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from anndata import AnnData
 from numpy.typing import NDArray
-from scipy.sparse import csr_matrix, sparray, spmatrix
+from scipy.sparse import csr_array, sparray, spmatrix
 from skimage.measure import label, regionprops
 
 from .._typealias import _AssignmentScoreMap, _CosineMap, _Kernel, _SignatureArray
@@ -52,7 +52,7 @@ def _localmax_anndata(
     )
 
     return AnnData(
-        X=csr_matrix(kde),
+        X=csr_array(kde),
         obs=obs,
         var=pd.DataFrame(index=pd.Index(genelist, name="gene")),
         obsm={"spatial": np.column_stack(coord)},
