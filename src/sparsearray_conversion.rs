@@ -2,7 +2,7 @@ use numpy::{Element, IntoPyArray, PyArray1, PyReadonlyArray1};
 use pyo3::{
     exceptions::{PyTypeError, PyValueError},
     prelude::*,
-    sync::GILOnceCell,
+    sync::PyOnceLock,
 };
 use sprs::{
     CompressedStorage::{CSC, CSR},
@@ -10,22 +10,22 @@ use sprs::{
 };
 
 // cache scipy imports
-static SP_SPARSE: GILOnceCell<Py<PyModule>> = GILOnceCell::new();
-static CSR_ARRAY: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
-static CSC_ARRAY: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
-static SPARRAY: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
-static SPMATRIX: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
+static SP_SPARSE: PyOnceLock<Py<PyModule>> = PyOnceLock::new();
+static CSR_ARRAY: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
+static CSC_ARRAY: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
+static SPARRAY: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
+static SPMATRIX: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
 // implement WrappedCsxView?
 
 /// Conversion type for sprs::CsMat <-> scipy.sparse.csx_array
 pub struct WrappedCsx<N, I: SpIndex, Iptr: SpIndex>(pub CsMatI<N, I, Iptr>);
 
-fn get_scipy_sparse(py: Python) -> PyResult<&Py<PyModule>> {
+fn get_scipy_sparse(py: Python<'_>) -> PyResult<&Py<PyModule>> {
     SP_SPARSE.get_or_try_init(py, || Ok(py.import("scipy.sparse")?.unbind()))
 }
 
-fn get_scipy_sparse_attr(py: Python, attr: &str) -> PyResult<PyObject> {
+fn get_scipy_sparse_attr(py: Python, attr: &str) -> PyResult<Py<PyAny>> {
     get_scipy_sparse(py)?.getattr(py, attr)
 }
 
@@ -76,15 +76,17 @@ impl<'py, N: Element, I: SpIndex + Element, Iptr: SpIndex + Element> IntoPyObjec
             .map(move |x| x.into_bound(py))
     }
 }
-impl<'py, N: Element + Clone, I: SpIndex + Element, Iptr: SpIndex + Element> FromPyObject<'py>
+impl<N: Element + Clone, I: SpIndex + Element, Iptr: SpIndex + Element> FromPyObject<'_, '_>
     for WrappedCsx<N, I, Iptr>
 {
-    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
+    type Error = PyErr;
+
+    fn extract(obj: Borrowed<'_, '_, PyAny>) -> Result<Self, Self::Error> {
         fn boundpyarray_to_vec<T: Element + Clone>(obj: Bound<'_, PyAny>) -> PyResult<Vec<T>> {
             Ok(obj.extract::<PyReadonlyArray1<T>>()?.as_array().to_vec())
         }
 
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let sparray = SPARRAY
                 .get_or_try_init(py, || get_scipy_sparse_attr(py, "sparray"))?
                 .bind(py);

@@ -6,11 +6,8 @@ use ndarray::{Array2, ArrayView2, Axis};
 use num::Zero;
 use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
 use polars::{
-    datatypes::{
-        CategoricalOrdering::Physical,
-        DataType::{Categorical, Int32, UInt32},
-    },
-    frame::column::ScalarColumn,
+    datatypes::DataType::{Int32, UInt32},
+    frame::column::{Column::Scalar, ScalarColumn},
     prelude::*,
 };
 use polars_arrow::array::{DictionaryArray, UInt32Array, Utf8Array};
@@ -58,7 +55,7 @@ pub struct GridCounts {
 }
 
 impl GridCounts {
-    pub fn get_view(&self, gene: &String) -> Option<CsMatViewI<Count, CsxIndex>> {
+    pub fn get_view(&self, gene: &String) -> Option<CsMatViewI<'_, Count, CsxIndex>> {
         self.counts.get(gene).map(|x| x.view())
     }
 
@@ -175,16 +172,18 @@ impl GridCounts {
 
             match df.column("count") {
                 // if counts does not exist use all 1s
-                Err(_) => {
-                    df.with_column(ScalarColumn::new("count".into(), 1u32.into(), df.height()))?
-                }
+                Err(_) => df.with_column(Scalar(ScalarColumn::new(
+                    "count".into(),
+                    1u32.into(),
+                    df.height(),
+                )))?,
                 Ok(s) => df.with_column(s.strict_cast(&UInt32)?)?,
             };
 
             if !df.column("gene")?.dtype().is_categorical() {
                 df.with_column(
                     df.column("gene")?
-                        .strict_cast(&Categorical(None, Physical))?,
+                        .strict_cast(&DataType::from_categories(Categories::global()))?,
                 )?;
             }
 
@@ -208,11 +207,9 @@ impl GridCounts {
                 .map(|df| {
                     let gene = df
                         .column("gene")?
-                        .categorical()?
-                        .iter_str()
-                        .next()
-                        .expect("df must be non-empty")
-                        .expect("`gene` must not be null")
+                        .get(0)?
+                        .get_str()
+                        .expect("`gene` must be a string")
                         .to_owned();
 
                     let x = col_as_nonull_vec(&df, "x", |s| s.i32())?;
@@ -393,7 +390,7 @@ impl GridCounts {
         });
 
         let gridcounts = triplet_to_dense(TriMatI::from_triplets(self.shape, i, j, v));
-        Python::with_gil(|py| gridcounts.into_pyarray(py).unbind())
+        Python::attach(|py| gridcounts.into_pyarray(py).unbind())
     }
 
     fn select_genes(&mut self, genes: HashSet<String>) {
@@ -510,7 +507,8 @@ impl GridCounts {
         .map_err(PyPolarsErr::from)?
         .into_column();
 
-        let df = DataFrame::new(vec![genes, x, y, counts]).map_err(PyPolarsErr::from)?;
+        let df =
+            DataFrame::new_infer_height(vec![genes, x, y, counts]).map_err(PyPolarsErr::from)?;
 
         Ok(PyDataFrame(df))
     }
