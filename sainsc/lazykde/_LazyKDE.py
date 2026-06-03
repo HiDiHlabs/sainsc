@@ -299,7 +299,11 @@ class LazyKDE:
         self._local_maxima = (local_max[:, 0], local_max[:, 1])
 
     def load_local_maxima(
-        self, genes: Iterable[str] | None = None, *, spatialdata: bool = False
+        self,
+        genes: Iterable[str] | None = None,
+        *,
+        spatialdata: bool = False,
+        img_genes: Iterable[str] | None = None,
     ) -> AnnData | SpatialData:
         """
         Load the gene expression (KDE) of the local maxima.
@@ -310,11 +314,19 @@ class LazyKDE:
         Parameters
         ----------
         genes : collections.abc.Iterable[str], optional
-            List of genes for which the KDE will be calculated.
+            List of genes for which the KDE of the local maxima will be calculated.
         spatialdata : bool, optional
             If True will load the data as a SpatialData object including the totalRNA
             projection and cell-type map if available. If False an AnnData object is
             returned.
+        spatialdata : bool, optional
+            If True will load the data as a SpatialData object including the totalRNA
+            projection and cell-type map if available. If False an AnnData object is
+            returned.
+        img_genes : collections.abc.Iterable[str], optional
+            List of genes for which the KDE is calculated and loaded as multi-channel
+            Image in SpatialData.
+            Only available if `spatialdata` is set to `True`.
 
         Returns
         -------
@@ -325,10 +337,15 @@ class LazyKDE:
         ModuleNotFoundError
             If `spatialdata` is set to `True` but the package is not installed.
         ValueError
-            If `self.kernel` is not set.
+            If `local_maxima` have not been identified.
+        ValueError
+            If not all `img_genes` exist in `self.genes`.
         """
         if self.local_maxima is None:
             raise ValueError("`local_maxima` have to be identified before loading")
+
+        if img_genes is not None and not all(g in self.genes for g in img_genes):
+            raise ValueError("Not all `img_genes` are available")
 
         genes = self.genes if genes is None else list(genes)
 
@@ -374,7 +391,16 @@ class LazyKDE:
 
                 if self.total_mRNA_KDE is not None:
                     sdata_dict["total_mRNA"] = Image2DModel.parse(
-                        np.atleast_3d(self.total_mRNA_KDE).T, dims=("c", "y", "x")
+                        self.total_mRNA_KDE[None, :, :], dims=("c", "x", "y")
+                    )
+
+                if img_genes is not None:
+                    import dask.array as da
+
+                    sdata_dict["KDE_genes"] = Image2DModel.parse(
+                        da.stack([self.kde(g).toarray() for g in img_genes], axis=0),
+                        dims=("c", "x", "y"),
+                        c_coords=img_genes,
                     )
 
                 if self.celltype_map is not None:
