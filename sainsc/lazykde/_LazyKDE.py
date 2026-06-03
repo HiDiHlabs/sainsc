@@ -355,83 +355,7 @@ class LazyKDE:
         )
 
         if spatialdata:
-            try:
-                from spatialdata import SpatialData
-                from spatialdata.models import (
-                    Image2DModel,
-                    Labels2DModel,
-                    PointsModel,
-                    TableModel,
-                )
-
-                x, y = adata.obsm["spatial"].T
-                del adata.obsm["spatial"]
-
-                localmax_name = "local_maxima"
-
-                local_max = PointsModel.parse(
-                    pd.DataFrame({"x": x, "y": y}, index=adata.obs_names)
-                )
-
-                adata.obs["region"] = localmax_name
-                adata.obs["region"] = adata.obs["region"].astype("category")
-                adata.obs["instance_key"] = adata.obs_names
-
-                local_max_anno = TableModel.parse(
-                    adata,
-                    region=localmax_name,
-                    region_key="region",
-                    instance_key="instance_key",
-                )
-
-                sdata_dict: dict[str, Any] = {
-                    localmax_name: local_max,
-                    f"{localmax_name}_annotation": local_max_anno,
-                }
-
-                if self.total_mRNA_KDE is not None:
-                    sdata_dict["total_mRNA"] = Image2DModel.parse(
-                        self.total_mRNA_KDE[None, :, :], dims=("c", "x", "y")
-                    )
-
-                if img_genes is not None:
-                    import dask.array as da
-
-                    sdata_dict["KDE_genes"] = Image2DModel.parse(
-                        da.stack([self.kde(g).toarray() for g in img_genes], axis=0),
-                        dims=("c", "x", "y"),
-                        c_coords=img_genes,
-                    )
-
-                if self.celltype_map is not None:
-                    label_name = "celltype_map"
-
-                    labels = self.celltype_map + 1
-                    if self.background is not None:
-                        labels[self.background] = 0
-
-                    sdata_dict[label_name] = Labels2DModel.parse(
-                        labels.T, dims=("y", "x")
-                    )
-
-                    obs = pd.DataFrame(
-                        {"region": label_name, "instance_key": self.celltypes},
-                        index=self.celltypes,
-                    ).astype({"region": "category"})
-
-                    sdata_dict[f"{label_name}_annotation"] = TableModel.parse(
-                        AnnData(obs=obs),
-                        region=label_name,
-                        region_key="region",
-                        instance_key="instance_key",
-                    )
-
-                return SpatialData.init_from_elements(sdata_dict)
-
-            except ModuleNotFoundError as e:
-                _raise_module_load_error(
-                    e, "load_local_maxima", pkg="spatialdata", extra="spatialdata"
-                )
+            return _localmax_spatialdata(adata, self, img_genes)
 
         else:
             load_attr = [
@@ -1344,3 +1268,84 @@ class LazyKDE:
         spacing = "    "
 
         return f"\n{spacing}".join(repr)
+
+
+def _localmax_spatialdata(
+    adata: AnnData, lazykde: LazyKDE, img_genes: Iterable[str] | None = None
+) -> SpatialData:
+
+    try:
+        import dask.array as da  # dependency of spatialdata
+        from spatialdata import SpatialData
+        from spatialdata.models import (
+            Image2DModel,
+            Labels2DModel,
+            PointsModel,
+            TableModel,
+        )
+    except ModuleNotFoundError as e:
+        _raise_module_load_error(
+            e, "load_local_maxima", pkg="spatialdata", extra="spatialdata"
+        )
+
+    x, y = adata.obsm["spatial"].T
+    del adata.obsm["spatial"]
+
+    localmax_name = "local_maxima"
+
+    local_max = PointsModel.parse(pd.DataFrame({"x": x, "y": y}, index=adata.obs_names))
+
+    adata.obs["region"] = pd.Series(
+        localmax_name, index=adata.obs_names, dtype="category"
+    )
+    adata.obs["instance_key"] = adata.obs_names
+
+    local_max_anno = TableModel.parse(
+        adata, region=localmax_name, region_key="region", instance_key="instance_key"
+    )
+
+    sdata_dict: dict[str, Any] = {
+        localmax_name: local_max,
+        f"{localmax_name}_annotation": local_max_anno,
+    }
+
+    # prepare single-channel images
+    for name in ["total_mRNA_KDE", "cosine_similarity", "assignment_score"]:
+        if (arr := getattr(lazykde, name)) is not None:
+            assert isinstance(arr, np.ndarray)
+
+            sdata_dict[name] = Image2DModel.parse(
+                np.nan_to_num(arr[None, :, :]), dims=("c", "x", "y")
+            )
+
+    # load KDE of selected genes as multi-channel image
+    if img_genes is not None:
+        sdata_dict["KDE_genes"] = Image2DModel.parse(
+            da.stack([lazykde.kde(g).toarray() for g in img_genes], axis=0),
+            dims=("c", "x", "y"),
+            c_coords=img_genes,
+        )
+
+    # prepare cell-type map
+    if lazykde.celltype_map is not None:
+        label_name = "celltype_map"
+
+        labels = lazykde.celltype_map + 1
+        if lazykde.background is not None:
+            labels[lazykde.background] = 0
+
+        sdata_dict[label_name] = Labels2DModel.parse(labels, dims=("x", "y"))
+
+        obs = pd.DataFrame(
+            {"region": label_name, "instance_key": lazykde.celltypes},
+            index=lazykde.celltypes,
+        ).astype({"region": "category"})
+
+        sdata_dict[f"{label_name}_annotation"] = TableModel.parse(
+            AnnData(obs=obs),
+            region=label_name,
+            region_key="region",
+            instance_key="instance_key",
+        )
+
+    return SpatialData.init_from_elements(sdata_dict)
