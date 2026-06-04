@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from typing import Protocol, TypeVar
+from typing import Protocol
 
 import numpy as np
 import pandas as pd
@@ -12,10 +12,7 @@ from .._typealias import _AssignmentScoreMap, _CosineMap, _Kernel, _SignatureArr
 from .._utils import _get_coordinate_index
 from .._utils_rust import GridCounts
 
-T = TypeVar("T", bound=np.number)
-U = TypeVar("U", bound=np.bool_ | np.integer)
-N = TypeVar("N", bound=int)
-_Shape = TypeVar("_Shape", bound=tuple[int, ...])
+type _Shape = tuple[int, ...]
 
 SCALEBAR_PARAMS = dict(frameon=False, color="w")
 """Default scalebar parameters"""
@@ -25,9 +22,9 @@ def _get_cell_dtype(n: int) -> np.dtype[np.signedinteger]:
     return np.result_type(np.int8, n)
 
 
-def _filter_blobs(
-    labeled_map: np.ndarray[_Shape, np.dtype[U]], min_blob_area: int
-) -> np.ndarray[_Shape, np.dtype[U]]:
+def _filter_blobs[T: np.bool_ | np.integer](
+    labeled_map: np.ndarray[_Shape, np.dtype[T]], min_blob_area: int
+) -> np.ndarray[_Shape, np.dtype[T]]:
     # remove small blops (i.e. "cells")
     if min_blob_area <= 0:
         raise ValueError("Area must be bigger than 0")
@@ -42,7 +39,7 @@ def _filter_blobs(
 def _localmax_anndata(
     kde: spmatrix | sparray | NDArray,
     genelist: Iterable[str],
-    coord: tuple[np.ndarray[tuple[N], np.dtype[np.integer]], ...],
+    coord: tuple[np.ndarray[tuple[int], np.dtype[np.integer]], ...],
     *,
     name: str | None = None,
     n_threads: int = 1,
