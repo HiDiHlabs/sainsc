@@ -9,20 +9,20 @@ description     = "Segmentation-free Analysis of In Situ Capture data"
 readme          = { file = "README.md", content-type = "text/markdown" }
 license         = "MIT"
 license-files   = ["LICENSE"]
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.11,<3.15"
 dynamic         = ["version"]
 
 authors = [
     { name = "Niklas Müller-Bötticher", email = "niklas.mueller-boetticher@charite.de" },
 ]
 dependencies = [
-    "anndata>=0.9",
+    "anndata>=0.11",
     "h5py>=3",
     "matplotlib>=3.7",
     "matplotlib-scalebar",
     "numpy>=1.24",
     "pandas>=2.0",
-    "polars[pandas]>=1",
+    "polars[pandas]~=1.39",
     "scikit-image>=0.20",
     "scipy>=1.10",
     "seaborn>=0.11",
@@ -40,7 +40,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-spatialdata = ["spatialdata>=0.1"]
+spatialdata = ["spatialdata>=0.7.2"]
 docs = [
     "sphinx",
     "sphinx-autoapi>=3.1",
@@ -100,4 +100,4 @@ skip = "pp*" # skip PyPy
 
 [tool.cibuildwheel.linux]
 # cibuildwheel runs linux in containers so we need to install rust there
-before-all = "curl -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y"
+before-all = "curl -sSf https://sh.rustup.rs | sh -s -- -y"

@@ -10,6 +10,8 @@ use std::{fmt::Display, hash::Hash, ops::AddAssign};
 type CoordInt = i32;
 type CodeInt = i32;
 
+// python bindings
+
 #[pyfunction]
 #[pyo3(signature = (x, y, *, n_threads=None))]
 /// Concatenate two int arrays into a string separated by underscore
@@ -25,6 +27,9 @@ pub fn coordinate_as_string<'py>(
     }
 }
 
+type Categorical<'a, Codes, Categories> =
+    (Bound<'a, PyArray1<Codes>>, Bound<'a, PyArray2<Categories>>);
+
 #[pyfunction]
 #[pyo3(signature = (x, y, *, n_threads=None))]
 /// From a list of coordinates extract a categorical representation
@@ -33,17 +38,14 @@ pub fn categorical_coordinate<'py>(
     x: PyReadonlyArray1<'py, CoordInt>,
     y: PyReadonlyArray1<'py, CoordInt>,
     n_threads: Option<usize>,
-) -> PyResult<(
-    Bound<'py, PyArray1<CodeInt>>,
-    Bound<'py, PyArray2<CoordInt>>,
-)> {
+) -> PyResult<Categorical<'py, CodeInt, CoordInt>> {
     match categorical_coordinate_(x.as_array(), y.as_array(), n_threads) {
         Ok((codes, coordinates)) => Ok((codes.into_pyarray(py), coordinates.into_pyarray(py))),
         Err(e) => Err(PyRuntimeError::new_err(e.to_string())),
     }
 }
 
-//// pure Rust part
+// pure Rust part
 
 /// Concatenate two int arrays into a 'string' array
 fn string_coordinate_index_<'a, X, const N: usize>(

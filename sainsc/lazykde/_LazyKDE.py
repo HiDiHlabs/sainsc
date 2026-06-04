@@ -299,7 +299,11 @@ class LazyKDE:
         self._local_maxima = (local_max[:, 0], local_max[:, 1])
 
     def load_local_maxima(
-        self, genes: Iterable[str] | None = None, *, spatialdata: bool = False
+        self,
+        genes: Iterable[str] | None = None,
+        *,
+        spatialdata: bool = False,
+        img_genes: Iterable[str] | None = None,
     ) -> AnnData | SpatialData:
         """
         Load the gene expression (KDE) of the local maxima.
@@ -310,11 +314,19 @@ class LazyKDE:
         Parameters
         ----------
         genes : collections.abc.Iterable[str], optional
-            List of genes for which the KDE will be calculated.
+            List of genes for which the KDE of the local maxima will be calculated.
         spatialdata : bool, optional
             If True will load the data as a SpatialData object including the totalRNA
             projection and cell-type map if available. If False an AnnData object is
             returned.
+        spatialdata : bool, optional
+            If True will load the data as a SpatialData object including the totalRNA
+            projection and cell-type map if available. If False an AnnData object is
+            returned.
+        img_genes : collections.abc.Iterable[str], optional
+            List of genes for which the KDE is calculated and loaded as multi-channel
+            Image in SpatialData.
+            Only available if `spatialdata` is set to `True`.
 
         Returns
         -------
@@ -325,10 +337,15 @@ class LazyKDE:
         ModuleNotFoundError
             If `spatialdata` is set to `True` but the package is not installed.
         ValueError
-            If `self.kernel` is not set.
+            If `local_maxima` have not been identified.
+        ValueError
+            If not all `img_genes` exist in `self.genes`.
         """
         if self.local_maxima is None:
             raise ValueError("`local_maxima` have to be identified before loading")
+
+        if img_genes is not None and not all(g in self.genes for g in img_genes):
+            raise ValueError("Not all `img_genes` are available")
 
         genes = self.genes if genes is None else list(genes)
 
@@ -338,74 +355,7 @@ class LazyKDE:
         )
 
         if spatialdata:
-            try:
-                from spatialdata import SpatialData
-                from spatialdata.models import (
-                    Image2DModel,
-                    Labels2DModel,
-                    PointsModel,
-                    TableModel,
-                )
-
-                x, y = adata.obsm["spatial"].T
-                del adata.obsm["spatial"]
-
-                localmax_name = "local_maxima"
-
-                local_max = PointsModel.parse(
-                    pd.DataFrame({"x": x, "y": y}, index=adata.obs_names)
-                )
-
-                adata.obs["region"] = localmax_name
-                adata.obs["region"] = adata.obs["region"].astype("category")
-                adata.obs["instance_key"] = adata.obs_names
-
-                local_max_anno = TableModel.parse(
-                    adata,
-                    region=localmax_name,
-                    region_key="region",
-                    instance_key="instance_key",
-                )
-
-                sdata_dict: dict[str, Any] = {
-                    localmax_name: local_max,
-                    f"{localmax_name}_annotation": local_max_anno,
-                }
-
-                if self.total_mRNA_KDE is not None:
-                    sdata_dict["total_mRNA"] = Image2DModel.parse(
-                        np.atleast_3d(self.total_mRNA_KDE).T, dims=("c", "y", "x")
-                    )
-
-                if self.celltype_map is not None:
-                    label_name = "celltype_map"
-
-                    labels = self.celltype_map + 1
-                    if self.background is not None:
-                        labels[self.background] = 0
-
-                    sdata_dict[label_name] = Labels2DModel.parse(
-                        labels.T, dims=("y", "x")
-                    )
-
-                    obs = pd.DataFrame(
-                        {"region": label_name, "instance_key": self.celltypes},
-                        index=self.celltypes,
-                    ).astype({"region": "category"})
-
-                    sdata_dict[f"{label_name}_annotation"] = TableModel.parse(
-                        AnnData(obs=obs),
-                        region=label_name,
-                        region_key="region",
-                        instance_key="instance_key",
-                    )
-
-                return SpatialData.from_elements_dict(sdata_dict)
-
-            except ModuleNotFoundError as e:
-                _raise_module_load_error(
-                    e, "load_local_maxima", pkg="spatialdata", extra="spatialdata"
-                )
+            return _localmax_spatialdata(adata, self, img_genes)
 
         else:
             load_attr = [
@@ -508,6 +458,8 @@ class LazyKDE:
                 raise ValueError(
                     "Cosine similarity threshold can only be used after cell-type assignment"
                 )
+
+            isnan_cs = np.isnan(self.cosine_similarity)
             if isinstance(min_cosine, dict):
                 if self.celltypes is None or self.celltype_map is None:
                     raise ValueError(
@@ -518,15 +470,17 @@ class LazyKDE:
                 threshold = _map_celltype_to_value(
                     self.celltype_map, min_cosine, self.celltypes
                 )
-                background |= self.cosine_similarity <= threshold
+                background |= (self.cosine_similarity <= threshold) | isnan_cs
             else:
-                background |= self.cosine_similarity <= min_cosine
+                background |= (self.cosine_similarity <= min_cosine) | isnan_cs
 
         if min_assignment is not None:
             if self.assignment_score is None:
                 raise ValueError(
                     "Assignment score threshold can only be used after cell-type assignment"
                 )
+
+            isnan_as = np.isnan(self.assignment_score)
             if isinstance(min_assignment, dict):
                 if self.celltypes is None or self.celltype_map is None:
                     raise ValueError(
@@ -537,9 +491,9 @@ class LazyKDE:
                 threshold = _map_celltype_to_value(
                     self.celltype_map, min_assignment, self.celltypes
                 )
-                background |= self.assignment_score <= threshold
+                background |= (self.assignment_score <= threshold) | isnan_as
             else:
-                background |= self.assignment_score <= min_assignment
+                background |= (self.assignment_score <= min_assignment) | isnan_as
 
         self._background = background  # type: ignore
 
@@ -557,6 +511,7 @@ class LazyKDE:
         signatures: pd.DataFrame,
         *,
         log: bool = False,
+        min_transcripts: int | None = None,
         chunk: tuple[int, int] = (500, 500),
     ):
         """
@@ -572,6 +527,9 @@ class LazyKDE:
         log : bool
             Whether to log transform the KDE when calculating the cosine similarity.
             This is useful if the gene signatures are derived from log-transformed data.
+        min_transcripts : int | None
+            Minimum number of transcripts to consider a chunk for processing. Can be used
+            to filter chunks with few "noisy" transcripts.
         chunk : tuple[int, int]
             Size of the chunks for processing. Larger chunks require more memory but
             have less duplicated computation.
@@ -618,6 +576,7 @@ class LazyKDE:
             signatures_mat,
             self.kernel,
             log=log,
+            min_transcripts=min_transcripts,
             chunk_size=chunk,
             n_threads=self.n_threads,
         )
@@ -629,16 +588,16 @@ class LazyKDE:
         img: np.ndarray[tuple[int, int], np.dtype],
         title: str,
         *,
-        remove_background: bool = False,
+        background=None,
         crop: _RangeTuple2D | None = None,
         scalebar: bool = True,
         im_kwargs: dict = dict(),
         scalebar_kwargs: dict = SCALEBAR_PARAMS,
     ) -> Figure:
-        if remove_background:
+        if background is not None:
             if self.background is not None:
                 img = img.copy()
-                img[self.background] = 0
+                img[self.background] = background
             else:
                 raise ValueError("`background` is undefined")
 
@@ -866,7 +825,7 @@ class LazyKDE:
         return self._plot_2d(
             img,
             title,
-            remove_background=remove_background,
+            background=0 if remove_background else None,
             crop=crop,
             scalebar=scalebar,
             im_kwargs=im_kwargs,
@@ -1066,7 +1025,7 @@ class LazyKDE:
             return self._plot_2d(
                 self.cosine_similarity,
                 "Cosine similarity",
-                remove_background=remove_background,
+                background=np.nan if remove_background else None,
                 crop=crop,
                 scalebar=scalebar,
                 im_kwargs=im_kwargs,
@@ -1113,7 +1072,7 @@ class LazyKDE:
             return self._plot_2d(
                 self.assignment_score,
                 "Assignment score",
-                remove_background=remove_background,
+                background=np.nan if remove_background else None,
                 crop=crop,
                 scalebar=scalebar,
                 im_kwargs=im_kwargs,
@@ -1309,3 +1268,84 @@ class LazyKDE:
         spacing = "    "
 
         return f"\n{spacing}".join(repr)
+
+
+def _localmax_spatialdata(
+    adata: AnnData, lazykde: LazyKDE, img_genes: Iterable[str] | None = None
+) -> SpatialData:
+
+    try:
+        import dask.array as da  # dependency of spatialdata
+        from spatialdata import SpatialData
+        from spatialdata.models import (
+            Image2DModel,
+            Labels2DModel,
+            PointsModel,
+            TableModel,
+        )
+    except ModuleNotFoundError as e:
+        _raise_module_load_error(
+            e, "load_local_maxima", pkg="spatialdata", extra="spatialdata"
+        )
+
+    x, y = adata.obsm["spatial"].T
+    del adata.obsm["spatial"]
+
+    localmax_name = "local_maxima"
+
+    local_max = PointsModel.parse(pd.DataFrame({"x": x, "y": y}, index=adata.obs_names))
+
+    adata.obs["region"] = pd.Series(
+        localmax_name, index=adata.obs_names, dtype="category"
+    )
+    adata.obs["instance_key"] = adata.obs_names
+
+    local_max_anno = TableModel.parse(
+        adata, region=localmax_name, region_key="region", instance_key="instance_key"
+    )
+
+    sdata_dict: dict[str, Any] = {
+        localmax_name: local_max,
+        f"{localmax_name}_annotation": local_max_anno,
+    }
+
+    # prepare single-channel images
+    for name in ["total_mRNA_KDE", "cosine_similarity", "assignment_score"]:
+        if (arr := getattr(lazykde, name)) is not None:
+            assert isinstance(arr, np.ndarray)
+
+            sdata_dict[name] = Image2DModel.parse(
+                np.nan_to_num(arr[None, :, :]), dims=("c", "x", "y")
+            )
+
+    # load KDE of selected genes as multi-channel image
+    if img_genes is not None:
+        sdata_dict["KDE_genes"] = Image2DModel.parse(
+            da.stack([lazykde.kde(g).toarray() for g in img_genes], axis=0),
+            dims=("c", "x", "y"),
+            c_coords=img_genes,
+        )
+
+    # prepare cell-type map
+    if lazykde.celltype_map is not None:
+        label_name = "celltype_map"
+
+        labels = lazykde.celltype_map + 1
+        if lazykde.background is not None:
+            labels[lazykde.background] = 0
+
+        sdata_dict[label_name] = Labels2DModel.parse(labels, dims=("x", "y"))
+
+        obs = pd.DataFrame(
+            {"region": label_name, "instance_key": lazykde.celltypes},
+            index=lazykde.celltypes,
+        ).astype({"region": "category"})
+
+        sdata_dict[f"{label_name}_annotation"] = TableModel.parse(
+            AnnData(obs=obs),
+            region=label_name,
+            region_key="region",
+            instance_key="instance_key",
+        )
+
+    return SpatialData.init_from_elements(sdata_dict)

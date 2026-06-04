@@ -59,6 +59,7 @@ def cosinef32_and_celltypei8(
     kernel: _Kernel,
     *,
     log: bool = False,
+    min_transcripts: int | None = None,
     chunk_size: tuple[int, int] = (500, 500),
     n_threads: int | None = None,
 ) -> tuple[
@@ -76,6 +77,7 @@ def cosinef32_and_celltypei16(
     kernel: _Kernel,
     *,
     log: bool = False,
+    min_transcripts: int | None = None,
     chunk_size: tuple[int, int] = (500, 500),
     n_threads: int | None = None,
 ) -> tuple[
@@ -248,7 +250,9 @@ class GridCounts:
             Range to crop as `(ymin, ymax)`
         """
 
-    def filter_mask(self, mask: np.ndarray[tuple[int, int], np.dtype[np.bool_]]):
+    def filter_mask(
+        self, mask: np.ndarray[tuple[int, int], np.dtype[np.bool_]], crop: bool = True
+    ):
         """
         Filter all genes with a binary mask.
 
@@ -256,6 +260,9 @@ class GridCounts:
         ----------
         mask : numpy.ndarray[numpy.bool]
             All counts where `mask` is `False` will be set to 0.
+        crop : bool
+            Whether to crop the data to the bounding box of the selected region.
+            This can improve performance by minimizing the sample size.
         """
 
     @property
