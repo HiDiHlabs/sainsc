@@ -4,8 +4,10 @@ spatially-resolved transcriptomics technologies and file formats.
 """
 
 from ._io import (
+    ATERA_CTRLS,
     VIZGEN_CTRLS,
     XENIUM_CTRLS,
+    read_Atera,
     read_gem_file,
     read_gem_header,
     read_StereoSeq,
@@ -16,8 +18,10 @@ from ._io import (
 )
 
 __all__ = [
+    "ATERA_CTRLS",
     "VIZGEN_CTRLS",
     "XENIUM_CTRLS",
+    "read_Atera",
     "read_gem_file",
     "read_gem_header",
     "read_StereoSeq",

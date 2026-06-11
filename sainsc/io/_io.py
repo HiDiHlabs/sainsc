@@ -202,7 +202,7 @@ def read_StereoSeq(
 
 
 # Xenium
-_XENIUM_COLUMNS = {"feature_name": "gene", "x_location": "x", "y_location": "y"}
+_10X_COLUMNS = {"feature_name": "gene", "x_location": "x", "y_location": "y"}
 XENIUM_CTRLS = [
     "^BLANK",
     "^DeprecatedCodeword",
@@ -244,7 +244,7 @@ def read_Xenium(
     sainsc.LazyKDE
     """
     filepath = Path(filepath)
-    columns = list(_XENIUM_COLUMNS.keys())
+    columns = list(_10X_COLUMNS.keys())
 
     if filepath.suffix == ".parquet":
         transcripts = pl.scan_parquet(filepath)
@@ -269,11 +269,65 @@ def read_Xenium(
             n_threads=n_threads,
         )
 
-    transcripts = transcripts.rename(_XENIUM_COLUMNS)
+    transcripts = transcripts.rename(_10X_COLUMNS)
     transcripts = _filter_genes(transcripts, remove_features)
 
     return LazyKDE.from_dataframe(
         transcripts, binsize=binsize, resolution=1_000, n_threads=n_threads
+    )
+
+
+# Atera
+
+# technically they are all dropped due to is_gene filter anyways
+ATERA_CTRLS = ["^Intergenic", "^NegControl", "^UnassignedCodeword"]
+"""Patterns for Atera controls"""
+
+
+@validate_threads
+def read_Atera(
+    filepath: _PathLike,
+    *,
+    binsize: float = 0.5,
+    remove_features: Collection[str] = ATERA_CTRLS,
+    n_threads: int | None = None,
+) -> LazyKDE:
+    """
+    Read an Atera transcripts file.
+
+    Parameters
+    ----------
+    filepath : os.PathLike or str
+        Path to the Atera transcripts file (.parquet).
+    binsize : float, optional
+        Size of each bin in um.
+    remove_features : collections.abc.Collection[str], optional
+        List of regex patterns to filter the 'feature_name' column,
+        :py:attr:`sainsc.io.ATERA_CTRLS` by default.
+        The data is automatically filtered with the 'is_gene' column, as well.
+    n_threads : int | None, optional
+        Number of threads used for processing. If `None` or 0 this will
+        default to the number of available CPUs.
+
+    Returns
+    -------
+    sainsc.LazyKDE
+    """
+    filepath = Path(filepath)
+    columns = list(_10X_COLUMNS.keys())
+
+    transcripts = pl.scan_parquet(filepath).filter(pl.col("is_gene")).select(columns)
+
+    with pl.StringCache():
+        transcripts = transcripts.with_columns(
+            pl.col("feature_name").cast(pl.Categorical)
+        )
+
+    transcripts = transcripts.rename(_10X_COLUMNS)
+    transcripts = _filter_genes(transcripts, remove_features)
+
+    return LazyKDE.from_dataframe(
+        transcripts.collect(), binsize=binsize, resolution=1_000, n_threads=n_threads
     )
 
 
