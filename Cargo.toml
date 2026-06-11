@@ -18,7 +18,7 @@ num           = { version = "0.4.1" }
 numpy         = { version = "0.27" }
 polars        = { version = "0.53", features = ["partition_by", "dtype-categorical"] }
 polars-arrow  = { version = "0.53" }
-pyo3          = { version = "0.27", features = ["extension-module"] }
+pyo3          = { version = "0.27", features = ["extension-module", "abi3"] }
 pyo3-polars   = { version = "0.26", features = ["dtype-categorical"] }
 rayon         = { version = "1.8" }
 sprs          = { version = "0.11.4", features = ["serde"] }

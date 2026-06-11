@@ -68,7 +68,8 @@ include = ["sainsc", "sainsc.io", "sainsc.lazykde", "sainsc.utils"]
 [tool.setuptools_scm]
 
 [[tool.setuptools-rust.ext-modules]]
-target = "sainsc._utils_rust"
+target         = "sainsc._utils_rust"
+py_limited_api = true
 
 
 [tool.ruff]
@@ -95,10 +96,10 @@ ignore-words-list = "coo,crate"
 
 [tool.cibuildwheel]
 archs = 'auto64'
-# build = 'cp310-*'
+build = 'cp311-*' # only build minimum python version because we use ABI3 builds
 skip = "pp*" # skip PyPy
 
 [tool.cibuildwheel.linux]
 # cibuildwheel runs linux in containers so we need to install rust there
-before-all = "curl -sSf https://sh.rustup.rs | sh -s -- -y"
+before-all  = "curl -sSf https://sh.rustup.rs | sh -s -- -y"
 environment = { PATH = "$PATH:$HOME/.cargo/bin" }
