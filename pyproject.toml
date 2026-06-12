@@ -103,3 +103,7 @@ skip  = "pp*"     # skip PyPy
 # cibuildwheel runs linux in containers so we need to install rust there
 before-all  = "curl -sSf https://sh.rustup.rs | sh -s -- -y"
 environment = { PATH = "$PATH:$HOME/.cargo/bin" }
+
+[tool.cibuildwheel.macos]
+# build for compatibility with macOS 11 and upwards
+environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
