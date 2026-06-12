@@ -36,22 +36,31 @@ If you prefer the installation using
     to speed up the installation.
 
 
-From GitHub
+From Source
 -----------
 
+If you want to to build the package from source (either from GitHub or PyPI) you will need a Rust compiler.
+You can follow the `official Rust documentation <https://www.rust-lang.org/tools/install>`_ or,
+if you are using ``conda`` install it via ``conda install conda-forge::rust``.
+
+To build the package from PyPI use
+
+.. code-block:: bash
+
+    pip install --no-binary sainsc
+
+
+GitHub
+~~~~~~
+
 You can install the latest versions directly from
-`GitHub <https://github.com/HiDiHlabs/sainsc>`_. To do so clone the repository using the
-``git clone`` command. Navigate into the downloaded directory and install using
+`GitHub <https://github.com/HiDiHlabs/sainsc>`_.
+To do so clone the repository using the ``git clone`` command.
+Navigate into the downloaded directory and install using
 
 .. code-block:: bash
 
     pip install .
-
-.. note::
-    If you want to to install the package from source (either from GitHub or with
-    ``pip install --no-binary sainsc``) you will need a Rust compiler. You can follow
-    the `official Rust documentation <https://www.rust-lang.org/tools/install>`_ or,
-    if you are using ``conda`` install it via ``conda install conda-forge::rust``.
 
 If you want to install the development version you can install the additional optional
 dependencies with
@@ -59,3 +68,9 @@ dependencies with
 .. code-block:: bash
 
     pip install -e .[dev]
+
+
+.. warning::
+
+    If you install editable builds (``-e``) the Rust compiler will default to a debug build,
+    i.e., the code is not optimized and slow. Don't use this for analysis (only for development)!
