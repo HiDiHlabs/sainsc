@@ -95,11 +95,15 @@ plugins                = "numpy.typing.mypy_plugin"
 ignore-words-list = "coo,crate"
 
 [tool.cibuildwheel]
-archs = 'auto64'
-build = 'cp311-*' # only build minimum python version because we use ABI3 builds
-skip = "pp*" # skip PyPy
+archs = "auto64"
+build = "cp311-*" # only build minimum python version because we use ABI3 builds
+skip  = "pp*"     # skip PyPy
 
 [tool.cibuildwheel.linux]
 # cibuildwheel runs linux in containers so we need to install rust there
 before-all  = "curl -sSf https://sh.rustup.rs | sh -s -- -y"
 environment = { PATH = "$PATH:$HOME/.cargo/bin" }
+
+[tool.cibuildwheel.macos]
+# build for compatibility with macOS 11 and upwards
+environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
