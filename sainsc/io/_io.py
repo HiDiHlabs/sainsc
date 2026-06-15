@@ -451,30 +451,30 @@ def read_VisiumHD(
 # Vizgen
 
 _VIZGEN_COLUMNS = {"gene": "gene", "global_x": "x", "global_y": "y"}
-VIZGEN_CTRLS = ["^Blank"]
-"""Patterns for Vizgen controls"""
+MERSCOPE_CTRLS = ["^Blank"]
+"""Patterns for MERSCOPE controls"""
 
 
 @validate_threads
-def read_Vizgen(
+def read_MERSCOPE(
     filepath: _PathLike,
     *,
     binsize: float = 0.5,
-    remove_genes: Collection[str] = VIZGEN_CTRLS,
+    remove_genes: Collection[str] = MERSCOPE_CTRLS,
     n_threads: int | None = None,
 ) -> LazyKDE:
     """
-    Read a Vizgen transcripts file.
+    Read a MERSCOPE transcripts file.
 
     Parameters
     ----------
     filepath : os.PathLike or str
-        Path to the Vizgen transcripts file.
+        Path to the MERSCOPE transcripts file.
     binsize : float, optional
         Size of each bin in um.
     remove_genes : collections.abc.Collection[str], optional
         List of regex patterns to filter the 'gene' column,
-        :py:attr:`sainsc.io.VIZGEN_CTRLS` by default.
+        :py:attr:`sainsc.io.MERSCOPE_CTRLS` by default.
     n_threads : int | None, optional
         Number of threads used for reading file and processing. If `None` or 0 this will
         default to the number of available CPUs.
@@ -483,15 +483,28 @@ def read_Vizgen(
     -------
     sainsc.LazyKDE
     """
+    filepath = Path(filepath)
+    columns = list(_VIZGEN_COLUMNS.keys())
 
-    transcripts = pl.read_csv(
-        Path(filepath),
-        columns=list(_VIZGEN_COLUMNS.keys()),
-        schema_overrides={"gene": pl.Categorical},
-        n_threads=n_threads,
-    ).rename(_VIZGEN_COLUMNS)
+    if filepath.suffix == ".csv":
+        transcripts = pl.read_csv(
+            filepath,
+            columns=columns,
+            schema_overrides={"gene": pl.Categorical},
+            n_threads=n_threads,
+        )
+    elif filepath.suffix == ".parquet":
+        # what about transcript_score (no documentation?)
+        transcripts = (
+            pl.scan_parquet(filepath)
+            .select(columns)
+            .with_columns(pl.col("gene").cast(pl.Categorical))
+            .collect()
+        )
+    else:
+        raise ValueError("Unexpected file format. Only .csv or .parquet are supported.")
 
-    transcripts = _filter_genes(transcripts, remove_genes)
+    transcripts = _filter_genes(transcripts.rename(_VIZGEN_COLUMNS), remove_genes)
 
     return LazyKDE.from_dataframe(
         transcripts, binsize=binsize, resolution=1_000, n_threads=n_threads
