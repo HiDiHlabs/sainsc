@@ -102,11 +102,11 @@ ignore-words-list = "coo,crate"
 
 [tool.cibuildwheel]
 archs = "auto64"
-build = "cp311-*" # only build minimum python version because we use ABI3 builds
+build = "cp312-*" # only build minimum python version because we use ABI3 builds
 skip  = "pp*"     # skip PyPy
 
 [tool.cibuildwheel.config-settings]
---build-option = "--py-limited-api=cp311"
+--build-option = "--py-limited-api=cp312"
 
 [tool.cibuildwheel.linux]
 # cibuildwheel runs linux in containers so we need to install rust there
