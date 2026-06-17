@@ -13,10 +13,6 @@ def _get_n_cpus() -> int:
     return min(available_cpus, 32)
 
 
-P = ParamSpec("P")
-T = TypeVar("T")
-
-
 def _validate_n_threads(n_threads: int | None) -> int:
     if n_threads is None:
         n_threads = 0
@@ -24,6 +20,10 @@ def _validate_n_threads(n_threads: int | None) -> int:
         raise ValueError("`n_threads` must be >= 0.")
     else:
         return n_threads if n_threads > 0 else _get_n_cpus()
+
+
+P = ParamSpec("P")
+T = TypeVar("T")
 
 
 def validate_threads(func: Callable[P, T]) -> Callable[P, T]:
@@ -37,18 +37,15 @@ def validate_threads(func: Callable[P, T]) -> Callable[P, T]:
     return wrapper
 
 
-N = TypeVar("N", bound=int)
-
-
 def _get_coordinate_index(
-    x: np.ndarray[tuple[N], np.dtype[np.integer]],
-    y: np.ndarray[tuple[N], np.dtype[np.integer]],
+    x: np.ndarray[tuple[int], np.dtype[np.integer]],
+    y: np.ndarray[tuple[int], np.dtype[np.integer]],
     *,
     name: str | None = None,
     n_threads: int | None = None,
 ) -> pd.Index:
-    x_i32: np.ndarray[tuple[N], np.dtype[np.int32]] = x.astype(np.int32, copy=False)
-    y_i32: np.ndarray[tuple[N], np.dtype[np.int32]] = y.astype(np.int32, copy=False)
+    x_i32: np.ndarray[tuple[int], np.dtype[np.int32]] = x.astype(np.int32, copy=False)
+    y_i32: np.ndarray[tuple[int], np.dtype[np.int32]] = y.astype(np.int32, copy=False)
 
     return pd.Index(
         coordinate_as_string(x_i32, y_i32, n_threads=n_threads), dtype=str, name=name

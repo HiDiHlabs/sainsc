@@ -1,11 +1,8 @@
 import math
-from typing import TypeVar
 
 import numpy as np
 from numpy.typing import DTypeLike
 from scipy import ndimage, signal
-
-T = TypeVar("T", bound=np.number)
 
 
 def _make_circular_mask(radius: int) -> np.ndarray[tuple[int, int], np.dtype[np.bool_]]:
@@ -15,7 +12,7 @@ def _make_circular_mask(radius: int) -> np.ndarray[tuple[int, int], np.dtype[np.
     return dist_from_center <= radius
 
 
-def _make_circular_kernel(
+def _make_circular_kernel[T: np.number](
     kernel: np.ndarray[tuple[int, int], np.dtype[T]], radius: int
 ) -> np.ndarray[tuple[int, int], np.dtype[T]]:
     kernel[~_make_circular_mask(radius)] = 0

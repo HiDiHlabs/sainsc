@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, Self, TypeVar
+from typing import TYPE_CHECKING, Any, Self
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -420,9 +420,8 @@ class LazyKDE:
             If cell type-specific thresholds do not include all cell types or if
             using cell type-specific thresholds before cell type assignment.
         """
-        T = TypeVar("T")
 
-        def _map_celltype_to_value(
+        def _map_celltype_to_value[T](
             ct_map: np.ndarray[tuple[int, ...], np.dtype[np.integer]],
             thresholds: dict[T, float],
             classes: list[T],
@@ -491,7 +490,7 @@ class LazyKDE:
             else:
                 background |= (self.assignment_score <= min_assignment) | isnan_as
 
-        self._background = background  # type: ignore
+        self._background = background
 
     @staticmethod
     def _calculate_cosine_celltype_fn(dtype) -> CosineCelltypeCallable:
@@ -598,7 +597,7 @@ class LazyKDE:
                 raise ValueError("`background` is undefined")
 
         if crop is not None:
-            img = img[tuple(slice(*c) for c in crop)]  # type: ignore
+            img = img[tuple(slice(*c) for c in crop)]
         fig, ax = plt.subplots(1, 1)
         assert isinstance(ax, Axes)
         im = ax.imshow(img.T, origin="lower", **im_kwargs)
@@ -864,8 +863,8 @@ class LazyKDE:
             x_min, x_max = crop[0]
             y_min, y_max = crop[1]
             keep = (x >= x_min) & (y >= y_min) & (x < x_max) & (y < y_max)
-            x = x[keep] - x_min  # type: ignore
-            y = y[keep] - y_min  # type: ignore
+            x = x[keep] - x_min
+            y = y[keep] - y_min
 
         fig = self.plot_KDE(crop=crop, **background_kwargs)
         fig.axes[0].scatter(x, y, **scatter_kwargs)
@@ -935,7 +934,7 @@ class LazyKDE:
                 celltype_map[self.background] = -1
 
         if crop is not None:
-            celltype_map = celltype_map[tuple(slice(*c) for c in crop)]  # type: ignore
+            celltype_map = celltype_map[tuple(slice(*c) for c in crop)]
 
         # shift so 0 will be background
         celltype_map += 1
