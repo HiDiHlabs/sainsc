@@ -49,6 +49,14 @@ docs = [
     "myst-nb",
 ]
 data = ["pooch>=1"]
+tutorial = [
+    "sainsc[data,spatialdata]",
+    "colorcet",
+    "scanpy>=1.12",
+    "squidpy",
+    "spatialdata-io",
+    "spatialdata-plot",
+]
 dev = ["sainsc[data,docs,spatialdata]", "pre-commit"]
 
 [project.urls]
@@ -97,7 +105,7 @@ ignore-words-list = "coo,crate"
 [tool.cibuildwheel]
 archs = 'auto64'
 build = 'cp311-*' # only build minimum python version because we use ABI3 builds
-skip = "pp*" # skip PyPy
+skip  = "pp*"     # skip PyPy
 
 [tool.cibuildwheel.linux]
 # cibuildwheel runs linux in containers so we need to install rust there

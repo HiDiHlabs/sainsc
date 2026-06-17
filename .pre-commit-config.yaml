@@ -21,6 +21,7 @@ repos:
     rev: v0.15.15
     hooks:
       - id: ruff-check
+        exclude: ^docs/source/.*/(?:tips|export)\.ipynb$
       - id: ruff-format
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v2.1.0
