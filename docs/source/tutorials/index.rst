@@ -6,7 +6,7 @@ tutorials may require additional dependencies. Pay close attention at the start 
 tutorial whether additional packages must be installed.
 Alternatively, you can install all packages required for the tutorials with
 
-.. code-block: bash
+.. code-block:: bash
 
     pip install sainsc[tutorial]
 

@@ -1,7 +1,7 @@
 What is sainsc?
 ===================
 
-sainsc (pronounced /ˈsaiəns/) is a segmentation-free analysis tool for spatial
+sainsc (pronounced /ˈsaiəns/, i.e., 'science') is a segmentation-free analysis tool for spatial
 transcriptomics from in situ capture technologies (but also works for
 imaging-based technologies).
 
