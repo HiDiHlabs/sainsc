@@ -49,6 +49,14 @@ docs = [
     "myst-nb",
 ]
 data = ["pooch>=1"]
+tutorial = [
+    "sainsc[data,spatialdata]",
+    "colorcet",
+    "scanpy>=1.12",
+    "squidpy",
+    "spatialdata-io",
+    "spatialdata-plot",
+]
 dev = ["sainsc[data,docs,spatialdata]", "pre-commit"]
 
 [project.urls]

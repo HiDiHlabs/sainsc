@@ -1,7 +1,7 @@
 import gzip
 from collections.abc import Collection
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypeVar
 
 import numpy as np
 import polars as pl
@@ -9,8 +9,10 @@ import polars as pl
 from .._typealias import _Coord, _PathLike
 from .._utils_rust import categorical_coordinate
 
+_DfLf = TypeVar("_DfLf", pl.DataFrame, pl.LazyFrame)
 
-def _bin_coordinates(df: pl.DataFrame, bin_size: float) -> pl.DataFrame:
+
+def _bin_coordinates(df: _DfLf, bin_size: float) -> _DfLf:
     df = df.with_columns(
         (pl.col(i) - pl.col(i).min()).floordiv(bin_size).cast(pl.Int32, strict=True)
         for i in ["x", "y"]
@@ -29,7 +31,7 @@ def _categorical_coordinate(
     return categorical_coordinate(x, y, n_threads=n_threads)
 
 
-def _filter_genes(df: pl.DataFrame, remove_features: Collection[str]) -> pl.DataFrame:
+def _filter_genes(df: _DfLf, remove_features: Collection[str]) -> _DfLf:
     if len(remove_features) > 0:
         df = df.filter(
             ~pl.col("gene").cast(pl.Utf8).str.contains(f"({'|'.join(remove_features)})")
