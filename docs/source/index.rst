@@ -1,7 +1,14 @@
 What is sainsc?
 ===================
 
-sainsc (pronounced /ˈsaiəns/, i.e., 'science') is a segmentation-free analysis tool for spatial
+.. |audio_science| raw:: html
+
+   <button onclick="new Audio('_static/science.mp3').play()"
+           style="border:none;background:none;cursor:pointer;padding:0;">
+     🔊
+   </button>
+
+sainsc (pronounced /ˈsaiəns/|audio_science|, i.e., 'science') is a segmentation-free analysis tool for spatial
 transcriptomics from in situ capture technologies (but also works for
 imaging-based technologies).
 
