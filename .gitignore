@@ -12,5 +12,7 @@ generated
 apidocs
 dist
 jupyter_execute
+.ipynb_checkpoints
+*.pickle
 
 settings.json

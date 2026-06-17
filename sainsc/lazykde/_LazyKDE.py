@@ -319,10 +319,6 @@ class LazyKDE:
             If True will load the data as a SpatialData object including the totalRNA
             projection and cell-type map if available. If False an AnnData object is
             returned.
-        spatialdata : bool, optional
-            If True will load the data as a SpatialData object including the totalRNA
-            projection and cell-type map if available. If False an AnnData object is
-            returned.
         img_genes : collections.abc.Iterable[str], optional
             List of genes for which the KDE is calculated and loaded as multi-channel
             Image in SpatialData.
