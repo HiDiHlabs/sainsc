@@ -22,11 +22,11 @@ __all__ = [
     "MERSCOPE_CTRLS",
     "XENIUM_CTRLS",
     "read_Atera",
-    "read_gem_file",
-    "read_gem_header",
     "read_MERSCOPE",
     "read_StereoSeq",
     "read_StereoSeq_bins",
     "read_VisiumHD",
     "read_Xenium",
+    "read_gem_file",
+    "read_gem_header",
 ]
