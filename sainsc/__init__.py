@@ -11,4 +11,4 @@ from . import io, lazykde, utils
 from ._utils_rust import GridCounts
 from .lazykde import LazyKDE
 
-__all__ = ["io", "lazykde", "utils", "GridCounts", "LazyKDE"]
+__all__ = ["GridCounts", "LazyKDE", "io", "lazykde", "utils"]

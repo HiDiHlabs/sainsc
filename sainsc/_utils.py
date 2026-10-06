@@ -1,6 +1,7 @@
 import functools
 import os
-from typing import Callable, NoReturn, ParamSpec, TypeVar
+from collections.abc import Callable
+from typing import NoReturn, ParamSpec, TypeVar
 
 import numpy as np
 import pandas as pd
